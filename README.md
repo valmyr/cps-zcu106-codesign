@@ -57,6 +57,10 @@ linha 254 - val bits = element.asUInt() altere para val bits = element.asUInt
 ```
 
 
+```
+../bin/lfc ./src/HelloWorld.lf
+```
+
 ## Links úteis
 
 https://classes.soe.ucsc.edu/cse228a/Winter23
