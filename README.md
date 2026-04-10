@@ -1,6 +1,7 @@
 # Alterações realizadas para funcionar
 
 ### Instale/Execute:
+
 ```
 curl -s "https://get.sdkman.io" | bash
 
@@ -8,7 +9,7 @@ source "$HOME/.sdkman/bin/sdkman-init.sh"
 
 sdk install scala 2.13.10
 
-````
+```
 
 ### Erro 0: Clone
 
@@ -48,7 +49,7 @@ Altere a versão do scala de 2.13.8 -> 2.13.10
 
 ```
 
-### Erro 2: Para os seguinte arquivo 
+### Erro 2: Para os seguintes arquivos
 ```bash
 
 ~/work/lingua-franca/core/src/main/resources/lib/chisel/reactor-chisel/fpga-tidbits/src/main/scala/fpgatidbits/platform-wrapper/PlatformWrapper.scala
@@ -60,6 +61,8 @@ linha 254 - val bits = element.asUInt() altere para val bits = element.asUInt
 ```
 ../bin/lfc ./src/HelloWorld.lf
 ```
+export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+export PATH=$JAVA_HOME/bin:$PATH
 
 ## Links úteis
 
