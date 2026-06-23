@@ -64,9 +64,9 @@ git clone https://github.com/erlingrj/lingua-franca.git --branch chisel3 --recur
 | Arquivo | Campo | De | Para |
 |---|---|---|---|
 | `core/src/main/kotlin/org/lflang/generator/chisel/ChiselSbtGenerator.kt` | scala | `2.13.8` | `2.13.10` |
-| `core/src/main/resources/lib/chisel/reactor-chisel/fpga-tidbits/build.sbt` | scala / chisel | `2.13.8` / `3.5.6` | `2.13.10` / `2.6.0` |
-| `core/src/main/resources/lib/chisel/reactor-chisel/build.sbt` | scala / chisel | `2.13.8` / `3.5.6` | `2.13.10` / `2.6.0` |
-| `core/src/main/resources/lib/chisel/reactor-chisel/build.sc` | scala / chisel | `2.13.8` / `3.5.6` | `2.13.10` / `2.6.0` |
+| `core/src/main/resources/lib/chisel/reactor-chisel/fpga-tidbits/build.sbt` | scala / chisel | `2.13.8` / `3.5.6` | `2.13.10` / `3.6.0` |
+| `core/src/main/resources/lib/chisel/reactor-chisel/build.sbt` | scala / chisel | `2.13.8` / `3.5.6` | `2.13.10` / `3.6.0` |
+| `core/src/main/resources/lib/chisel/reactor-chisel/build.sc` | scala / chisel | `2.13.8` / `3.5.6` | `2.13.10` / `3.6.0` |
 
 Para editar:
 
