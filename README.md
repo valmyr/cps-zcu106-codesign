@@ -86,7 +86,7 @@ Arquivo:
 core/src/main/resources/lib/chisel/reactor-chisel/fpga-tidbits/src/main/scala/fpgatidbits/platform-wrapper/PlatformWrapper.scala
 ```
 
-Na **linha 254**, substitua:
+Na **linha 243**, substitua:
 
 ```scala
 // Antes
