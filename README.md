@@ -52,7 +52,14 @@ echo "[OK] Submódulos atualizados com sucesso!"
 
 ### Problema 2 — Versões incompatíveis de Scala e Chisel
 
-Nos arquivos abaixo, atualize as versões conforme indicado:
+Nos arquivos abaixo, atualize as versões conforme indicado. Em seguida, execute o comando, aguarde a ocorrência de eventuais erros e corrija os arquivos, se necessário.
+
+```
+git clone https://github.com/erlingrj/lingua-franca.git --branch chisel3 --recursive && cd lingua-franca # Clone repo and check out the right branch
+./gradlew targetTest -Ptarget=Chisel # Run the set of Chisel-target integration tests
+./gradlew targetTest -Ptarget=Codesign # Run the set of Codesign-target integration tests
+
+```
 
 | Arquivo | Campo | De | Para |
 |---|---|---|---|
