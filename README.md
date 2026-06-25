@@ -99,6 +99,9 @@ val bits = element.asUInt
 ```
 
 ---
+## Após a alteração dos arquivos crie o executável 
+
+Para criar um lfc executável: ./gradlew assemble. O executável resultante pode ser encontrado em build/install/lf-cli. Navegue lfcaté um diretório no PATH do sistema ou adicione o diretório de instalação ao PATH.
 
 ## Compilar e executar
 
