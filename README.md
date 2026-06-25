@@ -137,14 +137,8 @@ val bits = element.asUInt
 
 ## Build e Execução
 
-### 1. Rodar os testes de integração
 
-```bash
-./gradlew targetTest -Ptarget=Chisel    # Testes do target Chisel
-./gradlew targetTest -Ptarget=Codesign  # Testes do target Codesign
-```
-
-### 2. Gerar o executável `lfc`
+### 1. Gerar o executável `lfc`
 
 ```bash
 ./gradlew assemble
@@ -156,7 +150,7 @@ O executável será gerado em `build/install/lf-cli/bin/lfc`. Adicione-o ao PATH
 export PATH="$PWD/build/install/lf-cli/bin:$PATH"
 ```
 
-### 3. Compilar um programa `.lf`
+### 2. Compilar um programa `.lf`
 
 ```bash
 lfc ./src/HelloWorld.lf
