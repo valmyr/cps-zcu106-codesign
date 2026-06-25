@@ -61,6 +61,8 @@ git clone https://github.com/erlingrj/lingua-franca.git --branch chisel3 --recur
 
 ```
 
+
+grep -R "2.13.8" -n .
 | Arquivo | Campo | De | Para |
 |---|---|---|---|
 | `core/src/main/kotlin/org/lflang/generator/chisel/ChiselSbtGenerator.kt` | scala | `2.13.8` | `2.13.10` |
