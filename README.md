@@ -23,7 +23,7 @@
 |---|---|
 | Java (OpenJDK) | 17 |
 | Scala | 2.13.10 |
-| sbt | 2.0.0+ |
+| sbt | 1.9.0+ |
 
 ### Java
 
@@ -40,7 +40,7 @@ source "$HOME/.sdkman/bin/sdkman-init.sh"
 sdk install scala 2.13.10
 ```
 
-> **Dica (zsh):** Para que o SDKMAN seja carregado automaticamente, adicione ao `~/.zshrc`:
+> **Dica (zsh):** para que o SDKMAN seja carregado automaticamente, adicione ao `~/.zshrc`:
 > ```bash
 > export SDKMAN_DIR="$HOME/.sdkman"
 > [[ -s "$HOME/.sdkman/bin/sdkman-init.sh" ]] && source "$HOME/.sdkman/bin/sdkman-init.sh"
@@ -70,17 +70,17 @@ Alguns submódulos usam URLs `git@github.com` (SSH), o que exige acesso de membr
 ```bash
 #!/bin/bash
 
-echo "[1] Forçando HTTPS ao invés de SSH..."
+echo "[1] Forçando HTTPS em vez de SSH..."
 git config --global url."https://github.com/".insteadOf git@github.com:
 
-echo "[2] Limpando estado antigo de submódulos..."
+echo "[2] Limpando estado antigo dos submódulos..."
 git submodule deinit -f --all || true
 rm -rf .git/modules || true
 
 echo "[3] Sincronizando .gitmodules..."
 git submodule sync --recursive
 
-echo "[4] Atualizando submódulos (recursivo)..."
+echo "[4] Atualizando submódulos (recursivamente)..."
 git submodule update --init --recursive --remote
 
 echo "[OK] Submódulos atualizados com sucesso!"
@@ -137,7 +137,6 @@ val bits = element.asUInt
 
 ## Build e Execução
 
-
 ### 1. Gerar o executável `lfc`
 
 ```bash
@@ -178,20 +177,45 @@ lfc ./src/HelloWorld.lf
 - [FPGA-SoC Workshop — CERN (PDF)](https://indico.cern.ch/event/1380885/attachments/2831544/4947319/FPGA-SoC%20workshop%20CERN.pdf)
 - [FPGA-Based Reactor Protection Systems — Sandia National Labs (PDF)](https://www.sandia.gov/app/uploads/sites/273/2024/11/Field-Programmable-Gate-Array-Based-Reactor-Protection-Systems-and-Potential-for-Inclusion-of-Secure-Elements-to-Improve-Cyberse.pdf)
 
+---
+---
 
-# Linux Embarcado - PetaLinux Xilinix
+# Linux Embarcado — PetaLinux (Xilinx)
 
-## Source Vitis 
-```
-source<Diretório de Instalação Vitis>/settings.sh
-```
-#Crie o script sdt.tcl
+> Guia de fluxo XSA → SDT → PetaLinux e boot via pen drive para a placa Zynq ZCU106.
+
+## Índice
+
+- [1. Configurar o ambiente Vitis](#1-configurar-o-ambiente-vitis)
+- [2. Gerar o Software Device Tree (SDT)](#2-gerar-o-software-device-tree-sdt)
+- [3. Configurar o ambiente PetaLinux](#3-configurar-o-ambiente-petalinux)
+- [4. Criar e configurar o projeto PetaLinux](#4-criar-e-configurar-o-projeto-petalinux)
+- [5. Incorporar as características do hardware ao PetaLinux](#5-incorporar-as-características-do-hardware-ao-petalinux)
+- [6. Ajustar o device tree do usuário](#6-ajustar-o-device-tree-do-usuário)
+- [7. Boot via pen drive](#7-boot-via-pen-drive)
+- [Problemas típicos e links úteis](#problemas-típicos-e-links-úteis)
+
+---
+
+## 1. Configurar o ambiente Vitis
+
+Carregue as variáveis de ambiente do Vitis:
 
 ```bash
-touch sdt.scl
+source <diretório de instalação do Vitis>/settings.sh
 ```
 
+## 2. Gerar o Software Device Tree (SDT)
+
+### Criar o script `sdt.tcl`
+
 ```bash
+touch sdt.tcl
+```
+
+Conteúdo do arquivo:
+
+```tcl
 set outdir [lindex $argv 1]
 set xsa [lindex $argv 0]
 exec rm -rf $outdir
@@ -199,126 +223,126 @@ sdtgen set_dt_param -xsa $xsa -dir $outdir -board_dts zcu106-reva
 sdtgen generate_sdt
 ```
 
+### Fluxo XSCT
 
-## XSCT Flow
 ```bash
-xsct sdt.tcl <Projeto Vivado>/<Diretório do arquivo XSA (Xilinx Support Archive)> sdt_outdir
+xsct sdt.tcl <projeto Vivado>/<diretório do arquivo XSA (Xilinx Support Archive)> sdt_outdir
 ```
 
-Mais detalhes em: [Conversão de Fluxo XSA para SDT](https://github.com/Xilinx/system-device-tree-xlnx/blob/master/README.md)
+Mais detalhes em: [Conversão de fluxo XSA para SDT](https://github.com/Xilinx/system-device-tree-xlnx/blob/master/README.md)
 
+## 3. Configurar o ambiente PetaLinux
 
-## Carregar as definições necesárias para usar o PetaLinux (Obs: Em outro terminal)
+Em **outro terminal**, carregue as variáveis de ambiente do PetaLinux:
+
 ```bash
-source <Diretório de instalação do PetaLinux>/settings.sh
+source <diretório de instalação do PetaLinux>/settings.sh
 ```
 
+## 4. Criar e configurar o projeto PetaLinux
 
-## Criar o projeto do Linux Embarcado baseado no Board Support Package da Zynq ZCU106
-```bash 
-petalinux-create project -s <Diretório do arquivo BSP>
+Crie o projeto do Linux embarcado com base no Board Support Package (BSP) da Zynq ZCU106:
+
+```bash
+petalinux-create -t project -s <diretório do arquivo BSP>
 ```
 
+## 5. Incorporar as características do hardware ao PetaLinux
 
-## Incorporando às caracteristicas do hardware ao PetaLinux
-
-```bash 
+```bash
 cd xilinx-zcu106-20xx.x
 ```
 
-```bash 
+```bash
 petalinux-config --get-hw-description ../sdt_outdir
 ```
 
-```bash 
+```bash
 petalinux-config -c rootfs
-
 ```
-
 
 ```bash
 petalinux-build
 ```
-## Copiar o conteúdo de ps.dtsi para system-user.dtsi 
-```bash 
+
+## 6. Ajustar o device tree do usuário
+
+Copie o conteúdo de `pl.dtsi` para `system-user.dtsi`:
+
+```bash
 sdt_outdir/pl.dtsi
 ```
-```bash 
+
+```bash
 code project-spec/meta-user/recipes-bsp/device-tree/files/system-user.dtsi
 ```
 
-## Boot pelo Pen Drive
-## Passo 0:  Abra o monitor serial para a UART de índice zero
-```bash 
+## 7. Boot via pen drive
+
+### Passo 0 — Abrir o monitor serial (UART de índice zero)
+
+```bash
 sudo screen /dev/ttyUSB0 115200
 ```
 
-Obs: o vitis facilita isso
-## Passo 1: Inicie U-Boot (Universal Bootloader) com uma image pré-compilada
+> **Obs.:** o Vitis facilita esse processo, oferecendo um terminal serial integrado.
 
-```bash 
+### Passo 1 — Iniciar o U-Boot com uma imagem pré-compilada
+
+```bash
 petalinux-boot jtag --prebuilt 2
-
 ```
 
-Obs: A Xilinx fornece o comando: ```petalinux-boot jtag --kernel```, Mas quando tentei, usar o kernel travou. Esse tutorial e bypass para isso, você pode tentar.
+> **Obs.:** a Xilinx fornece o comando `petalinux-boot jtag --kernel`, mas ao testá-lo o boot do kernel travou. Este passo é um contorno (*workaround*) para esse problema — sinta-se à vontade para tentar o comando oficial primeiro.
 
-## Passo 2: Copie os arquivos para o pendrive em uma pasta conhecida.
+### Passo 2 — Copiar os arquivos para o pen drive
 
-```bash 
-/image/linux/{image.ub e rootfs.cpio.gz.u-boot}
+Copie para uma pasta conhecida do pen drive:
+
+```
+/image/linux/{image.ub, rootfs.cpio.gz.u-boot}
 ```
 
-## Passo 3: Mova para a memória
+### Passo 3 — Carregar os arquivos para a memória
 
-Obs: Isso no terminal da uart que deve esta esperando comandos nesse estágio:
+No terminal da UART, que deve estar aguardando comandos nesse estágio:
 
-```bash 
+```
 zynq>
 ```
 
-```bash 
-zynq>fatload usb 0:1 0x10000000 {Diretório da pasta do pendrive}/image.ub
+Carregue a imagem do kernel:
 
 ```
-
-```bash 
-zynq>fatload usb 0:1 0x20000000 {Diretório da pasta do pendrive}/rootfs.cpio.gz.u-boot
-
+zynq>fatload usb 0:1 0x10000000 {diretório da pasta do pen drive}/image.ub
 ```
 
-## Passo 4: boot pela memoria
+Carregue o rootfs:
 
-```bash 
+```
+zynq>fatload usb 0:1 0x20000000 {diretório da pasta do pen drive}/rootfs.cpio.gz.u-boot
+```
+
+### Passo 4 — Boot pela memória
+
+```
 zynq>bootm 0x10000000 0x20000000
-
 ```
 
-### Exemplo pela UART no terminal do Vitis 
+### Exemplo completo (via UART, no terminal do Vitis)
 
-```bash 
+```
 zynq>fatload usb 0:1 0x10000000 vector_add_zcu106/image.ub
-```
-
-```bash 
 zynq>fatload usb 0:1 0x20000000 vector_add_zcu106/rootfs.cpio.gz.u-boot
-```
-
-```bash 
 zynq>bootm 0x10000000 0x20000000
 ```
 
-### Problemas Típicos e Links Úteis
+---
 
-[Problemas Típicos](https://rpi.camerafmc.com/en/latest/troubleshooting.html)
+## Problemas típicos e links úteis
 
-[Tutorial ZCU104](https://www.hackster.io/engrinam0077/zcu104-mpsoc-development-petalinux-2024-2-basic-tutorial-c82b8d)
-
-[Fluxo AVNET](https://gitlab.avnet.com/xilinx/example-board-projects/zcu106/vitis-platforms/avnet-sme-zcu106-vitis-platform-workflow-training/-/tree/main/2021.2/avtsme_zcu106_base)
-
-[Tutorial ZCU106](https://www.fpgalover.com/index.php/boards/39-zcu106/97-build-petalinux-for-zcu106-ps-and-pl-based-10g-ethernet)
-
-[Documentação PetaLinux](https://docs.amd.com/r/en-US/ug1144-petalinux-tools-reference-guide/Introduction)
-
-
-
+- [Problemas típicos](https://rpi.camerafmc.com/en/latest/troubleshooting.html)
+- [Tutorial ZCU104](https://www.hackster.io/engrinam0077/zcu104-mpsoc-development-petalinux-2024-2-basic-tutorial-c82b8d)
+- [Fluxo AVNET](https://gitlab.avnet.com/xilinx/example-board-projects/zcu106/vitis-platforms/avnet-sme-zcu106-vitis-platform-workflow-training/-/tree/main/2021.2/avtsme_zcu106_base)
+- [Tutorial ZCU106](https://www.fpgalover.com/index.php/boards/39-zcu106/97-build-petalinux-for-zcu106-ps-and-pl-based-10g-ethernet)
+- [Documentação PetaLinux](https://docs.amd.com/r/en-US/ug1144-petalinux-tools-reference-guide/Introduction)
