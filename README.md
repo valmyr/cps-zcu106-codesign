@@ -177,3 +177,105 @@ lfc ./src/HelloWorld.lf
 - [Chisel: Constructing Hardware in a Scala Embedded Language — ASPIRE/Berkeley](https://aspire.eecs.berkeley.edu/projects/chisel-constructing-hardware-in-a-scala-embedded-language)
 - [FPGA-SoC Workshop — CERN (PDF)](https://indico.cern.ch/event/1380885/attachments/2831544/4947319/FPGA-SoC%20workshop%20CERN.pdf)
 - [FPGA-Based Reactor Protection Systems — Sandia National Labs (PDF)](https://www.sandia.gov/app/uploads/sites/273/2024/11/Field-Programmable-Gate-Array-Based-Reactor-Protection-Systems-and-Potential-for-Inclusion-of-Secure-Elements-to-Improve-Cyberse.pdf)
+
+
+# Linux Embarcado - PetaLinux Xilinix
+
+## Source Vitis 
+```
+source<Diretório de Instalação Vitis>/settings.sh
+```
+#Crie o script sdt.tcl
+
+```
+touch sdt.scl
+```
+
+```
+set outdir [lindex $argv 1]
+set xsa [lindex $argv 0]
+exec rm -rf $outdir
+sdtgen set_dt_param -xsa $xsa -dir $outdir -board_dts zcu106-reva
+sdtgen generate_sdt
+```
+
+
+## XSCT Flow
+```xsct sdt.tcl <Projeto Vivado>/<Diretório do arquivo XSA (Xilinx Support Archive)> sdt_outdir ```
+
+Mais detalhes em: [Conversão de Fluxo XSA para SDT](https://github.com/Xilinx/system-device-tree-xlnx/blob/master/README.md)
+
+
+## Carregar as definições necesárias para usar o PetaLinux (Obs: Em outro terminal)
+```source <Diretório de instalação do PetaLinux>/settings.sh ```
+
+
+## Criar o projeto do Linux Embarcado baseado no Board Support Package da Zynq ZCU106
+```petalinux-create project -s <Diretório do arquivo BSP>```
+
+
+## Incorporando às caracteristicas do hardware ao PetaLinux
+
+```cd xilinx-zcu106-20xx.x```
+
+```petalinux-config --get-hw-description ../sdt_outdir```
+
+```petalinux-config -c rootfs```
+
+
+``` petalinux-build ```
+## Copiar o conteúdo de ps.dtsi para system-user.dtsi 
+```sdt_outdir/pl.dtsi ```
+```code project-spec/meta-user/recipes-bsp/device-tree/files/system-user.dtsi```
+
+## Boot pelo Pen Drive
+## Passo 0:  Abra o monitor serial para a UART de índice zero
+```sudo screen /dev/ttyUSB0 115200```
+
+Obs: o vitis facilita isso
+## Passo 1: Inicie U-Boot (Universal Bootloader) com uma image pré-compilada
+
+```petalinux-boot jtag --prebuilt 2```
+
+Obs: A Xilinx fornece o comando: ```petalinux-boot jtag --kernel```, Mas quando tentei, usar o kernel travou. Esse tutorial e bypass para isso, você pode tentar.
+
+## Passo 2: Copie os arquivos para o pendrive em uma pasta conhecida.
+
+```/image/linux/{image.ub e rootfs.cpio.gz.u-boot}```
+
+## Passo 3: Mova para a memória
+
+Obs: Isso no terminal da uart que deve esta esperando comandos nesse estágio:
+
+```zynq>```
+
+```zynq>fatload usb 0:1 0x10000000 {Diretório da pasta do pendrive}/image.ub```
+
+```zynq>fatload usb 0:1 0x20000000 {Diretório da pasta do pendrive}/rootfs.cpio.gz.u-boot```
+
+## Passo 4: boot pela memoria
+
+```zynq>bootm 0x10000000 0x20000000```
+
+### Exemplo pela UART no terminal do Vitis 
+
+```zynq>fatload usb 0:1 0x10000000 vector_add_zcu106/image.ub```
+
+```zynq>fatload usb 0:1 0x20000000 vector_add_zcu106/rootfs.cpio.gz.u-boot```
+
+```zynq>bootm 0x10000000 0x20000000```
+
+### Problemas Típicos e Links Úteis
+
+[Problemas Típicos](https://rpi.camerafmc.com/en/latest/troubleshooting.html)
+
+[Tutorial ZCU104](https://www.hackster.io/engrinam0077/zcu104-mpsoc-development-petalinux-2024-2-basic-tutorial-c82b8d)
+
+[Fluxo AVNET](https://gitlab.avnet.com/xilinx/example-board-projects/zcu106/vitis-platforms/avnet-sme-zcu106-vitis-platform-workflow-training/-/tree/main/2021.2/avtsme_zcu106_base)
+
+[Tutorial ZCU106](https://www.fpgalover.com/index.php/boards/39-zcu106/97-build-petalinux-for-zcu106-ps-and-pl-based-10g-ethernet)
+
+[Documentação PetaLinux](https://docs.amd.com/r/en-US/ug1144-petalinux-tools-reference-guide/Introduction)
+
+
+
