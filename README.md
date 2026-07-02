@@ -187,11 +187,11 @@ source<Diretório de Instalação Vitis>/settings.sh
 ```
 #Crie o script sdt.tcl
 
-```
+```bash
 touch sdt.scl
 ```
 
-```
+```bash
 set outdir [lindex $argv 1]
 set xsa [lindex $argv 0]
 exec rm -rf $outdir
@@ -201,69 +201,112 @@ sdtgen generate_sdt
 
 
 ## XSCT Flow
-```xsct sdt.tcl <Projeto Vivado>/<Diretório do arquivo XSA (Xilinx Support Archive)> sdt_outdir ```
+```bash
+xsct sdt.tcl <Projeto Vivado>/<Diretório do arquivo XSA (Xilinx Support Archive)> sdt_outdir
+```
 
 Mais detalhes em: [Conversão de Fluxo XSA para SDT](https://github.com/Xilinx/system-device-tree-xlnx/blob/master/README.md)
 
 
 ## Carregar as definições necesárias para usar o PetaLinux (Obs: Em outro terminal)
-```source <Diretório de instalação do PetaLinux>/settings.sh ```
+```bash
+source <Diretório de instalação do PetaLinux>/settings.sh
+```
 
 
 ## Criar o projeto do Linux Embarcado baseado no Board Support Package da Zynq ZCU106
-```petalinux-create project -s <Diretório do arquivo BSP>```
+```bash 
+petalinux-create project -s <Diretório do arquivo BSP>
+```
 
 
 ## Incorporando às caracteristicas do hardware ao PetaLinux
 
-```cd xilinx-zcu106-20xx.x```
+```bash 
+cd xilinx-zcu106-20xx.x
+```
 
-```petalinux-config --get-hw-description ../sdt_outdir```
+```bash 
+petalinux-config --get-hw-description ../sdt_outdir
+```
 
-```petalinux-config -c rootfs```
+```bash 
+petalinux-config -c rootfs
+
+```
 
 
-``` petalinux-build ```
+```bash
+petalinux-build
+```
 ## Copiar o conteúdo de ps.dtsi para system-user.dtsi 
-```sdt_outdir/pl.dtsi ```
-```code project-spec/meta-user/recipes-bsp/device-tree/files/system-user.dtsi```
+```bash 
+sdt_outdir/pl.dtsi
+```
+```bash 
+code project-spec/meta-user/recipes-bsp/device-tree/files/system-user.dtsi
+```
 
 ## Boot pelo Pen Drive
 ## Passo 0:  Abra o monitor serial para a UART de índice zero
-```sudo screen /dev/ttyUSB0 115200```
+```bash 
+sudo screen /dev/ttyUSB0 115200
+```
 
 Obs: o vitis facilita isso
 ## Passo 1: Inicie U-Boot (Universal Bootloader) com uma image pré-compilada
 
-```petalinux-boot jtag --prebuilt 2```
+```bash 
+petalinux-boot jtag --prebuilt 2
+
+```
 
 Obs: A Xilinx fornece o comando: ```petalinux-boot jtag --kernel```, Mas quando tentei, usar o kernel travou. Esse tutorial e bypass para isso, você pode tentar.
 
 ## Passo 2: Copie os arquivos para o pendrive em uma pasta conhecida.
 
-```/image/linux/{image.ub e rootfs.cpio.gz.u-boot}```
+```bash 
+/image/linux/{image.ub e rootfs.cpio.gz.u-boot}
+```
 
 ## Passo 3: Mova para a memória
 
 Obs: Isso no terminal da uart que deve esta esperando comandos nesse estágio:
 
-```zynq>```
+```bash 
+zynq>
+```
 
-```zynq>fatload usb 0:1 0x10000000 {Diretório da pasta do pendrive}/image.ub```
+```bash 
+zynq>fatload usb 0:1 0x10000000 {Diretório da pasta do pendrive}/image.ub
 
-```zynq>fatload usb 0:1 0x20000000 {Diretório da pasta do pendrive}/rootfs.cpio.gz.u-boot```
+```
+
+```bash 
+zynq>fatload usb 0:1 0x20000000 {Diretório da pasta do pendrive}/rootfs.cpio.gz.u-boot
+
+```
 
 ## Passo 4: boot pela memoria
 
-```zynq>bootm 0x10000000 0x20000000```
+```bash 
+zynq>bootm 0x10000000 0x20000000
+
+```
 
 ### Exemplo pela UART no terminal do Vitis 
 
-```zynq>fatload usb 0:1 0x10000000 vector_add_zcu106/image.ub```
+```bash 
+zynq>fatload usb 0:1 0x10000000 vector_add_zcu106/image.ub
+```
 
-```zynq>fatload usb 0:1 0x20000000 vector_add_zcu106/rootfs.cpio.gz.u-boot```
+```bash 
+zynq>fatload usb 0:1 0x20000000 vector_add_zcu106/rootfs.cpio.gz.u-boot
+```
 
-```zynq>bootm 0x10000000 0x20000000```
+```bash 
+zynq>bootm 0x10000000 0x20000000
+```
 
 ### Problemas Típicos e Links Úteis
 
