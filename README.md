@@ -274,7 +274,11 @@ petalinux-config -c rootfs
 ```bash
 petalinux-build
 ```
+ou
 
+```bash
+petalinux-build -c petalinux-image-full
+```
 ## 6. Ajustar o device tree do usuário
 
 Copie o conteúdo de `pl.dtsi` para `system-user.dtsi`:
