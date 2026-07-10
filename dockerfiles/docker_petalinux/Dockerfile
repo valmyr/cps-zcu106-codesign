@@ -89,6 +89,7 @@ RUN dpkg --add-architecture i386 && apt-get update && apt-get install -y --no-in
     neofetch \
     openssh-server \
     dnsutils \
+    zsh       \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # -----------------------------------------------------------------------------
@@ -201,6 +202,7 @@ COPY --chown=${PETALINUX_USER}:${PETALINUX_USER} ${PETALINUX_INSTALLER} /tmp/${P
 USER ${PETALINUX_USER}
 
 WORKDIR /home/${PETALINUX_USER}
+RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
 
 RUN chmod +x /tmp/${PETALINUX_INSTALLER} && \
     env TERM=xterm \
@@ -217,4 +219,4 @@ RUN chmod +x /tmp/${PETALINUX_INSTALLER} && \
 ENV DEBIAN_FRONTEND=dialog
 
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
-CMD ["/bin/bash"]
+CMD ["/bin/zsh"]
