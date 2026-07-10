@@ -202,7 +202,14 @@ COPY --chown=${PETALINUX_USER}:${PETALINUX_USER} ${PETALINUX_INSTALLER} /tmp/${P
 USER ${PETALINUX_USER}
 
 WORKDIR /home/${PETALINUX_USER}
-RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+###############################################################################
+# Oh My Zsh
+###############################################################################
+
+RUN RUNZSH=no \
+    CHSH=no \
+    KEEP_ZSHRC=yes \
+    sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
 
 RUN chmod +x /tmp/${PETALINUX_INSTALLER} && \
     env TERM=xterm \
