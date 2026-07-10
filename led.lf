@@ -1,0 +1,17 @@
+target Chisel
+
+reactor Blinky {
+    @external
+    output led: {=Bool()=}
+    state count: {=UInt(32.W)=}
+    timer t(0, 500 msec)
+
+    reaction(t) -> led {=
+        lf_set(led, ~lf_get(out))
+        lf_write(count, lf_read(count)+1.U)
+    =}
+}
+
+main reactor {
+    blinky = new Blinky()
+}
