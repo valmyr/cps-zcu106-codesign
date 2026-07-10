@@ -31,9 +31,10 @@ RUN apt-get update && apt-get install -y \
     software-properties-common \
     openjdk-17-jdk \
     net-tools \
-    cmake           \
-    zsh            \
-    gradle && \
+    cmake \
+    zsh \
+    gradle \
+    sudo && \
     rm -rf /var/lib/apt/lists/*
 
 ###############################################################################
@@ -166,21 +167,21 @@ RUN gradle --version
 RUN sbt --version
 
 RUN lfc --help
-
 ###############################################################################
 # Usuário lingua-franca
 ###############################################################################
 
-RUN useradd -m -s /bin/bash lingua-franca
+RUN useradd -m -s /bin/bash -G sudo lingua-franca
 
-# Dá posse do projeto ao novo usuário: o lfc escreve ali (ex.:
-# test/Codesign/codesign-gen/...), então ele precisa ter permissão de escrita,
-# não só de leitura.
+RUN echo 'lingua-franca:1234' | chpasswd
+
+RUN echo 'lingua-franca ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/lingua-franca && \
+    chmod 0440 /etc/sudoers.d/lingua-franca
+
+# Dá posse do projeto
 RUN chown -R lingua-franca:lingua-franca /opt/lingua-franca
 
-# Reaproveita o cache do sbt/coursier/ivy2 já baixado durante a build (como
-# root), pra evitar que o lfc tenha que rebaixar chisel3/chiseltest/scala do
-# zero na primeira vez que rodar como o novo usuário.
+# Copia os caches do sbt
 RUN for d in .cache .ivy2 .sbt; do \
       if [ -d "/root/$d" ]; then \
         cp -a "/root/$d" "/home/lingua-franca/$d"; \
@@ -188,13 +189,32 @@ RUN for d in .cache .ivy2 .sbt; do \
     done && \
     chown -R lingua-franca:lingua-franca /home/lingua-franca
 
-RUN mkdir -p /workspace && chown lingua-franca:lingua-franca /workspace
+RUN mkdir -p /workspace && \
+    chown lingua-franca:lingua-franca /workspace
 
-RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
-
-RUN echo 'lingua-franca:1234' | chpasswd
+###############################################################################
+# Troca para o usuário
+###############################################################################
 
 USER lingua-franca
+
+WORKDIR /home/lingua-franca
+
+###############################################################################
+# Oh My Zsh
+###############################################################################
+
+RUN RUNZSH=no \
+    CHSH=no \
+    KEEP_ZSHRC=yes \
+    sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+
+###############################################################################
+# Copia exemplos
+###############################################################################
+
+RUN mkdir -p ~/test && \
+    cp -r /opt/lingua-franca/test/* ~/test/
 
 WORKDIR /home/lingua-franca
 
