@@ -7,7 +7,7 @@ reactor Blinky {
     timer t(0, 500 msec)
 
     reaction(t) -> led {=
-        lf_set(led, ~lf_get(out))
+        lf_set(led, ~lf_get(led))
         lf_write(count, lf_read(count)+1.U)
     =}
 }
