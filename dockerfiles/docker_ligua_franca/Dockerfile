@@ -30,7 +30,9 @@ RUN apt-get update && apt-get install -y \
     verilator \
     software-properties-common \
     openjdk-17-jdk \
+    net-tools \
     cmake           \
+    zsh            \
     gradle && \
     rm -rf /var/lib/apt/lists/*
 
@@ -188,8 +190,12 @@ RUN for d in .cache .ivy2 .sbt; do \
 
 RUN mkdir -p /workspace && chown lingua-franca:lingua-franca /workspace
 
+RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+
+RUN echo 'lingua-franca:1234' | chpasswd
+
 USER lingua-franca
 
-WORKDIR /workspace
+WORKDIR /home/lingua-franca
 
-CMD ["/bin/bash"]
+CMD ["/bin/zsh"]
