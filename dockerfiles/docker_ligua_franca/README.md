@@ -141,9 +141,7 @@
 ## COMO USAR
 ```bash
 docker build -t lf-chisel .
-docker run -d -p 2222:22 -v "$(pwd)/meus-lf:/workspace" --name lf lf-chisel
-docker ps                              # confirma que o container continua "Up"
-ssh -p 2222 lingua-franca@localhost    # senha: 1234
+docker run -it --rm -v "$(pwd)/meus-lf:/workspace" lf-chisel
 
 ```
 Dentro do container, `lfc <arquivo>.lf` já está no PATH. Os testes do fork
@@ -155,9 +153,10 @@ etc.). Para usar seus próprios `.lf`, monte-os em `/workspace`, que é o
 ### Acessar via SSH
 Mapeie a porta 22 do container para uma porta local (ex.: 2222) ao subir:
 ```bash
+docker build -t lf-chisel .
 docker run -d -p 2222:22 -v "$(pwd)/meus-lf:/workspace" --name lf lf-chisel
-ssh -p 2222 lingua-franca@localhost
-# senha: 1234
+docker ps                              # confirma que o container continua "Up"
+ssh -p 2222 lingua-franca@localhost    # senha: 1234
 ```
 Se preferir não deixar o container em background, `-it --rm` também
 funciona normalmente - o `sshd` sobe do mesmo jeito antes do `CMD`.
