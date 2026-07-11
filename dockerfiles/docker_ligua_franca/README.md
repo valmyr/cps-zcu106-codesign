@@ -68,7 +68,40 @@
    Ubuntu. Maven Central / Coursier só entram em cena depois, no primeiro
    `lfc` real que gera hardware (item 5).
 
-7) **`AXIPlatformWrapper.scala` é sobrescrito no build (fix do nome `csr`
+7) **É obrigatório especificar a plataforma alvo no target `Codesign`.**
+   Todo `.lf` que usa `target Codesign` precisa declarar a propriedade
+   `fpgaBoard`, indicando para qual placa/plataforma o hardware Chisel deve
+   ser gerado:
+   ```lf
+   target Codesign {
+       fpgaBoard: "PYNQZCU104CC"
+   }
+   ```
+   `<platform>` é uma das opções suportadas pelo `fpga-tidbits`:
+   - `VerilatedTester`
+   - `GenericSDAccel`
+   - `PYNQZ1`
+   - `PYNQZCU104`
+   - `ZC706`
+   - `PYNQZCU104CC`
+   - `ZedBoard`
+   - `WX690T`
+   - `PYNQU96CC`
+   - `Tester`
+   - `PYNQU96`
+
+   Essa mesma plataforma é o que se passa manualmente para o `sbt` do
+   `fpga-tidbits` ao gerar/rodar o hardware fora do fluxo do `lfc`, dentro
+   de `src-gen/reactor-chisel` do projeto gerado:
+   ```bash
+   cd Projeto/src-gen/reactor-chisel
+   sbt "fpgatidbits/run verilog HelloAccel PYNQZCU104CC"
+   sbt "fpgatidbits/run"
+   ```
+   Sem `fpgaBoard` definido no target (ou passado ao `sbt`), a geração do
+   hardware não sabe para qual placa compilar e falha.
+
+8) **`AXIPlatformWrapper.scala` é sobrescrito no build (fix do nome `csr`
    duplicado).**
    Sem essa correção, a elaboração de hardware falha com:
    `Attempted to name ZedBoardWrapper.csr: IO[AXILiteExternalIF] with a
