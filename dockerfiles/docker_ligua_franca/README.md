@@ -1,6 +1,18 @@
-## Dockerfile - Ambiente de build para o Lingua Franca (fork `chisel3` / target Codesign)
+# Dockerfile - Ambiente de build para o Lingua Franca (fork `chisel3` / target Codesign)
 
-### LEIA ANTES DE USAR
+## Requisitos
+
+- **Espaço em disco: mínimo de 3 GB livres** antes de iniciar o `docker build`.
+  Esse valor cobre a imagem base + JDK 17 + toolchain do gradle/sbt. Ele
+  **não** inclui o que o sbt baixa na primeira compilação de um target
+  Codesign real (`chisel3`/`chiseltest`/Scala e dependências transitivas -
+  ver item 5 abaixo), então reserve espaço extra além desse mínimo,
+  principalmente se for compilar vários testes Codesign diferentes (cada um
+  gera sua própria pasta em `codesign-gen/`).
+- Docker com suporte a `# syntax=docker/dockerfile:1` (heredocs em `RUN`).
+- Acesso de rede durante o build (ver item 6 abaixo).
+
+## LEIA ANTES DE USAR
 
 1) **Fork usado, não o lf-lang oficial.**
    Este Dockerfile clona `erlingrj/lingua-franca` na branch `chisel3`, um fork
@@ -56,7 +68,30 @@
    Ubuntu. Maven Central / Coursier só entram em cena depois, no primeiro
    `lfc` real que gera hardware (item 5).
 
-### COMO USAR
+7) **`AXIPlatformWrapper.scala` é sobrescrito no build (fix do nome `csr`
+   duplicado).**
+   Sem essa correção, a elaboração de hardware falha com:
+   `Attempted to name ZedBoardWrapper.csr: IO[AXILiteExternalIF] with a
+   duplicated name 'csr'. Use suggestName to seed a unique name`. Isso
+   acontece porque o arquivo original declara o `Wire` interno da lógica de
+   regfile como `val csr = Wire(...)` - mesmo nome do IO externo
+   `csr` (`extCsrIf.suggestName("csr")`) - e um wrapper concreto (ex.
+   `ZedBoardWrapper`) acaba colidindo com esse nome na elaboração. O
+   Dockerfile substitui o arquivo em
+   `core/src/main/resources/lib/chisel/.../platform-wrapper/axi/AXIPlatformWrapper.scala`
+   por uma versão corrigida que renomeia o `Wire` interno para `csrSlave`
+   (mantendo o IO externo `csr` inalterado) e troca
+   `FPGAQueue(writeBurstAdp.out_writeData, 2) <> mem(i).writeData` por uma
+   instância explícita `Module(new FPGAQueue(...))`. O mesmo arquivo
+   corrigido também é copiado para
+   `core/build/resources/main/lib/chisel/.../platform-wrapper/axi/AXIPlatformWrapper.scala`
+   (a segunda cópia listada no `find`, gerada pelo processamento de
+   resources do gradle), garantindo que as duas fiquem idênticas mesmo se
+   essa pasta já existir de um build/cache anterior. Esses passos rodam
+   antes de `./gradlew assemble`, então já entram no `lfc` empacotado na
+   imagem.
+
+## COMO USAR
 ```bash
 docker build -t lf-chisel .
 docker run -it --rm -v "$(pwd)/meus-lf:/workspace" lf-chisel
@@ -67,10 +102,10 @@ ficam em `/opt/lingua-franca/test/` (o target Codesign, especificamente, em
 etc.). Para usar seus próprios `.lf`, monte-os em `/workspace`, que é o
 `WORKDIR` do container.
 
-ESPAÇO EM DISCO: não medimos o uso exato, mas conte com a imagem base + JDK
-17 + toolchain do gradle/sbt (alguns GB) mais o que o sbt baixar na primeira
-compilação de um target Codesign (item 5) - `chisel3`/`chiseltest`/Scala
-trazem bastante coisa transitiva. Não é da magnitude de um toolchain de
-vendor de FPGA (dezenas de GB), mas vale reservar espaço de sobra,
-principalmente se for compilar vários testes Codesign diferentes (cada um
-gera sua própria pasta em `codesign-gen/`).
+ESPAÇO EM DISCO: não medimos o uso exato, mas conte com **no mínimo 3 GB**
+para a imagem base + JDK 17 + toolchain do gradle/sbt, mais o que o sbt
+baixar na primeira compilação de um target Codesign (item 5) -
+`chisel3`/`chiseltest`/Scala trazem bastante coisa transitiva. Não é da
+magnitude de um toolchain de vendor de FPGA (dezenas de GB), mas vale
+reservar espaço de sobra, principalmente se for compilar vários testes
+Codesign diferentes (cada um gera sua própria pasta em `codesign-gen/`).
