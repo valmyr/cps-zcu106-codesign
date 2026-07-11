@@ -127,6 +127,17 @@
    antes de `./gradlew assemble`, então já entram no `lfc` empacotado na
    imagem.
 
+9) **SSH habilitado, porta 22 exposta.**
+   O `openssh-server` (instalado desde o início do Dockerfile) agora é
+   configurado e iniciado: host keys geradas com `ssh-keygen -A`,
+   `PasswordAuthentication yes`, `PermitRootLogin no`, `/run/sshd`
+   criado. Como o `CMD` roda como usuário `lingua-franca` (não root), o
+   `sshd` é subido por um entrypoint (`/usr/local/bin/entrypoint.sh`) via
+   `sudo /usr/sbin/sshd` antes de entregar o shell/`CMD` normalmente.
+   Login por senha usa o mesmo usuário/senha do container:
+   `lingua-franca` / `1234`. Para acessar, mapeie a porta ao rodar o
+   container (ver "COMO USAR").
+
 ## COMO USAR
 ```bash
 docker build -t lf-chisel .
@@ -137,6 +148,16 @@ ficam em `/opt/lingua-franca/test/` (o target Codesign, especificamente, em
 `/opt/lingua-franca/test/Codesign/src/` - `HelloCodesign.lf`, `VectorAdd.lf`,
 etc.). Para usar seus próprios `.lf`, monte-os em `/workspace`, que é o
 `WORKDIR` do container.
+
+### Acessar via SSH
+Mapeie a porta 22 do container para uma porta local (ex.: 2222) ao subir:
+```bash
+docker run -d -p 2222:22 -v "$(pwd)/meus-lf:/workspace" --name lf lf-chisel
+ssh -p 2222 lingua-franca@localhost
+# senha: 1234
+```
+Se preferir não deixar o container em background, `-it --rm` também
+funciona normalmente - o `sshd` sobe do mesmo jeito antes do `CMD`.
 
 ESPAÇO EM DISCO: não medimos o uso exato, mas conte com **no mínimo 3 GB**
 para a imagem base + JDK 17 + toolchain do gradle/sbt, mais o que o sbt
