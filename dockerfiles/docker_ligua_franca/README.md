@@ -1,5 +1,8 @@
 # Dockerfile - Ambiente de build para o Lingua Franca (fork `chisel3` / target Codesign)
 
+> Histórico cronológico de todas as correções aplicadas à imagem: veja
+> [`CHANGELOG.md`](./CHANGELOG.md).
+
 ## Requisitos
 
 - **Espaço em disco: mínimo de 3 GB livres** antes de iniciar o `docker build`.
