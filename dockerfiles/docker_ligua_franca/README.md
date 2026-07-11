@@ -141,7 +141,10 @@
 ## COMO USAR
 ```bash
 docker build -t lf-chisel .
-docker run -it --rm -v "$(pwd)/meus-lf:/workspace" lf-chisel
+docker run -d -p 2222:22 -v "$(pwd)/meus-lf:/workspace" --name lf lf-chisel
+docker ps                              # confirma que o container continua "Up"
+ssh -p 2222 lingua-franca@localhost    # senha: 1234
+
 ```
 Dentro do container, `lfc <arquivo>.lf` já está no PATH. Os testes do fork
 ficam em `/opt/lingua-franca/test/` (o target Codesign, especificamente, em
