@@ -1098,3 +1098,85 @@ SUCCESS (compiling generated C++ code)
 | Execução na placa física | Tudo junto, de verdade, incluindo bitstream e device tree | **Sim** | ⏳ Pendente |
 
 Quatro dos cinco níveis de teste estão cobertos sem depender de acesso à placa física — o único item pendente é a execução real, que depende das etapas ainda em aberto (Vivado/bitstream, overlay de device tree aplicado no PetaLinux, `ZYNQ_BITFILE_LOADER`/estratégia de carga de bitstream para o `UioDriver`).
+
+---
+
+## 14. `clock-period` — correção necessária antes de qualquer síntese real
+
+**Importante**: isto não é um bug introduzido pelo trabalho documentado neste README (Fases 1-3, `UioDriver`, generalização). É uma propriedade de target que já existia no compilador `lfc`, mas que **nenhum `.lf` usado nos testes desta série declarou explicitamente** — por isso passou despercebida até este ponto.
+
+### 14.1 O problema
+
+Todos os testes de geração de `lfFPGA.a` realizados até aqui (`PYNQZCU104CC`, `ZCU106`, `TESTBOARD`, o ciclo completo da seção 13) usaram o valor **default** de `clock-period`, que é `1 nsec` (`Reactor.scala:25`, `clockPeriod: Time = Time.nsec(1)`). Isso equivale a assumir um clock de **1GHz** na PL — um valor que não corresponde a nenhuma frequência física plausível para o Block Design que será montado no Vivado.
+
+### 14.2 Por que isso afeta hardware real, não só simulação
+
+`clockPeriod` é consumido diretamente na lógica RTL de coordenação de tempo lógico, não apenas em testbench:
+
+```scala
+// Reaction.scala:83
+physicalTag := physicalTag + globalReactorConfig.clockPeriod.nanoseconds.U
+
+// TriggerGenerator.scala:45
+regClock := regClock + cfg.clockPeriod.nanoseconds.U
+```
+
+Esses registradores (`physicalTag`, `regClock`) são incrementados **a cada ciclo de clock real do hardware**, somando `clockPeriod.nanoseconds` por incremento — o RTL sintetizado assume literalmente "cada pulso de clock recebido corresponde a X nanosegundos de tempo lógico". Se o clock físico de PL configurado no Vivado não bater com o valor usado na geração do RTL, o sistema de coordenação de tags (`nextEventTag`, `tagAdvanceGrant`, timers, deadlines) fica dessincronizado da realidade física — um erro de correção funcional, não de desempenho.
+
+### 14.3 Confirmação da propagação (a propriedade funciona corretamente)
+
+Antes de aplicar a correção, foi confirmado que `clock-period` propaga corretamente por toda a cadeia — não é necessária nenhuma correção adicional no compilador, só declarar o valor explicitamente:
+
+```
+TargetProperty.java:646-654        → "clock-period" é propriedade de target válida
+CodesignHwEmitter.kt:65-66         → propaga clock-period para o _FpgaTop.lf gerado
+ChiselMainFileGenerator.kt:34      → clockPeriod = Time.nsec(${targetConfig.clockPeriod.toNanoSeconds()})
+```
+
+A interpolação `${targetConfig.clockPeriod.toNanoSeconds()}` confirma que o valor é avaliado em tempo de geração e escrito como literal no `LfMain.scala` do projeto — não há hardcode no gerador.
+
+### 14.4 Teste de validação
+
+```lf
+target Codesign {
+  fpgaBoard: ZCU106,
+  clock-period: 10 nsec
+}
+```
+
+Regenerado e confirmado em duas camadas:
+
+`_FpgaTop.lf` gerado:
+```lf
+// This file is code-generated DO NOT EDIT.
+target Chisel {
+  codesign: true,
+  fpgaBoard: ZCU106,
+  clock-period: 10 nsec,
+}
+```
+
+`LfMain.scala` gerado:
+```bash
+grep "clockPeriod = Time.nsec" ~/codesign-gen/meu_teste/src-gen/hardware/_FpgaTop/src/main/scala/Main.scala
+# implicit val globalConfig = GlobalReactorConfig(timeout = Time.NEVER, standalone=false, clockPeriod = Time.nsec(10))
+```
+
+Confirma propagação correta: `Time.nsec(10)`, não mais o default `Time.nsec(1)`.
+
+### 14.5 Implicação para os testes já realizados nesta série
+
+Todos os `lfFPGA.a` gerados nas seções 8, 10, 11 e 13 (antes desta descoberta) foram sintetizados assumindo 1GHz de clock lógico. Isso **não invalida** a validação de geração de driver/`lfFPGA.a` em si (independente do valor de `clock-period`), mas **invalidaria a correção funcional do timing lógico** se qualquer um desses artefatos específicos fosse sintetizado no Vivado e rodado numa placa real sem primeiro corrigir esse parâmetro.
+
+### 14.6 Ação obrigatória antes de qualquer síntese Vivado real
+
+Todo `.lf` que mira hardware físico deve declarar `clock-period` explicitamente, com o valor correspondente à frequência real de clock que será fornecida ao wrapper (`ZCU106Wrapper`/`PYNQZCU104CCWrapper`/etc.) no Block Design do Vivado:
+
+```lf
+target Codesign {
+  fpgaBoard: ZCU106,
+  clock-period: 10 nsec   // ajustar para o clock real do Block Design (ex.: 10ns = 100MHz)
+}
+```
+
+**Checklist antes da síntese**: confirmar a frequência do clock que alimenta o `ZCU106Wrapper` no Vivado (tipicamente configurada no IP do PS via `zynq_ultra_ps_e` ou num gerador de clock/PLL do Block Design), calcular o período correspondente em nanossegundos, e declarar esse valor exato no `.lf` antes de gerar o RTL a ser sintetizado.
