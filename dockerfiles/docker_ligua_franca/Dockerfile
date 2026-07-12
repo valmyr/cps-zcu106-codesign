@@ -33,9 +33,12 @@ RUN apt-get update && apt-get install -y \
     net-tools \
     cmake \
     zsh \
+    g++-aarch64-linux-gnu \
+    gcc-aarch64-linux-gnu \
     gradle \
     sudo && \
     rm -rf /var/lib/apt/lists/*
+
 
 ###############################################################################
 # Instala SBT
@@ -422,6 +425,7 @@ RUN RUNZSH=no \
 RUN mkdir -p ~/test && \
     cp -r /opt/lingua-franca/test/* ~/test/
 
-WORKDIR /home/lingua-franca
+WORKDIR /home/lingua-franca 
+RUN git clone https://github.com/erlingrj/reactor-chisel-benchmarks.git
 
 CMD ["/bin/zsh"]
