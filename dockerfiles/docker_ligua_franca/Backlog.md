@@ -1,4 +1,4 @@
-# Backlog — Suporte Nativo ZCU106 no `lfc` + Guia de Desenvolvimento Autônomo
+# Backlog — Suporte Nativo ZCU106 no `lfc` 
 
 Documentação de como o compilador Lingua Franca (`lfc`) passou a gerar `lfFPGA.a` nativamente para a plataforma `PYNQZCU104CC` (chip idêntico ao da ZCU106), eliminando a necessidade de reeditar arquivos manualmente a cada geração — e um guia para o time continuar desenvolvendo isso de forma autônoma.
 
@@ -359,7 +359,197 @@ Caso o driver `LinuxPhysRegDriver`/`/dev/mem` se mostre bloqueado por `CONFIG_ST
 
 ---
 
-## 7. Checklist de estado atual
+## 8. Generalização — de "ZCU106 hardcoded" para "qualquer placa"
+
+### 8.1 O problema identificado
+
+Mesmo após a seção 4, o `mainCodesign` ainda tinha o nome do driver **hardcoded**:
+
+```scala
+Seq(cxx, "-fpermissive", "-c", "platform-zedboard-linux.cpp", "-o", "platform-zedboard-linux.o")
+```
+
+Isso funcionava para `PYNQZCU104CC`, mas qualquer placa nova exigiria editar esse arquivo de novo — não era generalização de verdade. O trabalho foi dividido em 3 fases.
+
+### 8.2 Fase 1 — Identidade própria para a ZCU106
+
+Em vez de continuar reaproveitando o nome `PYNQZCU104CC`, foi criado um wrapper com nome próprio: `fpga-tidbits/.../platform-wrapper/axi/ZCU106Wrapper.scala`.
+
+```scala
+package fpgatidbits.PlatformWrapper
+import chisel3._
+import fpgatidbits.TidbitsMakeUtils._
+object ZCU106Params extends PlatformWrapperParams {
+  val platformName = "ZCU106"
+  val memAddrBits = 32
+  val memDataBits = 64
+  val memIDBits = 6
+  val memMetaBits = 1
+  val numMemPorts = 1
+  val sameIDInOrder = true
+  val typicalMemLatencyCycles = 32
+  val burstBeats = 8
+  val coherentMem = true
+}
+class ZCU106Wrapper(instFxn: PlatformWrapperParams => GenericAccelerator, targetDir: String)
+  extends AXIPlatformWrapper(PYNQZCU104Params, instFxn) {
+  val platformDriverFiles = baseDriverFiles ++ Array[String](
+    "platform-zedboard-linux.cpp", "linuxphysregdriver.hpp", "axiregdriver.hpp"
+  )
+  suggestName("ZCU106Wrapper")
+  mem(0).readAddr.bits.cache := "b1100".U
+  mem(0).writeAddr.bits.cache := "b1100".U
+  mem(0).readAddr.bits.prot := "b10".U
+  mem(0).writeAddr.bits.prot := "b10".U
+  generateRegDriver(targetDir)
+  resourceCopyBulk("cpp/platform-wrapper-regdriver/", targetDir, platformDriverFiles)
+  println(s"=======> Driver files copied to ${targetDir}")
+}
+```
+
+Registro em `fpgatidbits/Main.scala` (`platformMap` e `fpgaPartMap`):
+
+```scala
+"ZCU106" -> {(f, targetDir) => new ZCU106Wrapper(f, targetDir)},
+```
+```scala
+"ZCU106" -> "xczu7ev-ffvc1156-2-e",   // mesmo part number do PYNQZCU104CC — mesmo chip
+```
+
+**Validado**: `fpgaBoard: ZCU106` gera `ZCU106Wrapper.v`/`.fir`/`.anno.json` e `lfFPGA.a` de ponta a ponta.
+
+### 8.3 Fase 2 — Driver canônico de 64 bits
+
+Objetivo: adotar o `UioDriver` (seguro em 64 bits, sem `-fpermissive`) como driver de referência para a família MPSoC, em vez do driver legado de 32 bits herdado do ZedBoard.
+
+Arquivos novos, com nomes neutros (não específicos de uma placa): `uiodriver.hpp` e `platform-mpsoc-uio.cpp` (mesmo conteúdo do `UioDriver`/`platform-zcu106.cpp` já documentado no README anterior desta série).
+
+`ZCU106Wrapper.scala` atualizado:
+```scala
+val platformDriverFiles = baseDriverFiles ++ Array[String](
+  "platform-mpsoc-uio.cpp", "uiodriver.hpp"
+)
+```
+
+**Validado**: compilação **sem nenhum warning** (diferente do driver de 32 bits, que sempre gera warnings de truncamento de ponteiro). `lfFPGA.a` contém `platform-mpsoc-uio.o`.
+
+### 8.4 Fase 3 — `mainCodesign` genérico (a peça central)
+
+Elimina o hardcode de vez: o `mainCodesign` passa a **ler** o nome do driver e as flags de compilação a partir da própria instância do wrapper.
+
+Novos campos na classe base (`PlatformWrapper.scala`), com valores padrão — não abstratos, para não quebrar os ~10 wrappers já existentes que não os implementam:
+
+```scala
+def platformDriverFiles: Seq[String]  // additional files
+
+// Nome do .cpp que contém initPlatform/deinitPlatform, dentro de platformDriverFiles.
+// Por padrão, deduzido automaticamente: o primeiro .cpp da lista.
+def platformMainDriverFile: String = platformDriverFiles.find(_.endsWith(".cpp")).getOrElse("")
+
+// Flags extras de compilação para platformMainDriverFile (ex: "-fpermissive"
+// para drivers legados de 32 bits). Vazio por padrão.
+def platformDriverExtraFlags: Seq[String] = Seq()
+```
+
+`mainCodesign` refatorado (`reactor-chisel/src/main/scala/Main.scala`):
+
+```scala
+def mainCodesign(platformInstFxn: PlatformInstFxn, mainReactorFunc: () => Reactor, mainReactorSwIOFunc: () => SwIO, targetDir: String, globalConfig: GlobalReactorConfig) = {
+  println("------------------------------------------------------------------------------------------------------")
+  println("Running Chisel compiler to generate verilator project")
+  println("------------------------------------------------------------------------------------------------------")
+  val chiselArgs = Array("--target-dir", s"$targetDir")
+  var platformWrapperInst: PlatformWrapper = null
+  (new chisel3.stage.ChiselStage).emitVerilog({
+    platformWrapperInst = platformInstFxn(p => new CodesignTopReactor(p, mainReactorFunc, mainReactorSwIOFunc)(globalConfig), targetDir)
+    platformWrapperInst
+  }, chiselArgs)
+  if (platformInstFxn.equals(TidbitsMakeUtils.platformMap("VerilatedTester"))) {
+    resourceCopyBulk("simulator/codesign", targetDir, Seq("main.cpp", "Makefile"))
+    println("------------------------------------------------------------------------------------------------------")
+    println("Building verilator project")
+    println("------------------------------------------------------------------------------------------------------")
+    val result = Process("make lib", new java.io.File(targetDir)).!
+    println(s"Library produced to $targetDir/lfFPGA.a.")
+  } else {
+    // Real hardware platform: cross-compile the driver into lfFPGA.a.
+    // Driver file and flags are read from the wrapper instance itself
+    // (platformMainDriverFile / platformDriverExtraFlags), not hardcoded here.
+    println("------------------------------------------------------------------------------------------------------")
+    println("Cross-compiling hardware driver for real FPGA platform")
+    println("------------------------------------------------------------------------------------------------------")
+    val cxx = sys.env.getOrElse("LF_FPGA_CXX", "aarch64-linux-gnu-g++")
+    val ar = sys.env.getOrElse("LF_FPGA_AR", "aarch64-linux-gnu-ar")
+    val targetDirFile = new java.io.File(targetDir)
+    val mainDriverFile = platformWrapperInst.platformMainDriverFile
+    val extraFlags = platformWrapperInst.platformDriverExtraFlags
+    if (mainDriverFile.isEmpty) {
+      throw new RuntimeException("No platformMainDriverFile (.cpp) found in platformDriverFiles for this platform")
+    }
+    val objFile = mainDriverFile.stripSuffix(".cpp") + ".o"
+    println(s"Compiling driver: $mainDriverFile (flags: ${extraFlags.mkString(" ")})")
+    val compileResult = Process(
+      Seq(cxx) ++ extraFlags ++ Seq("-c", mainDriverFile, "-o", objFile),
+      targetDirFile
+    ).!
+    if (compileResult != 0) {
+      throw new RuntimeException(s"Failed to cross-compile $mainDriverFile (exit code $compileResult)")
+    }
+    val arResult = Process(
+      Seq(ar, "rcs", "lfFPGA.a", objFile),
+      targetDirFile
+    ).!
+    if (arResult != 0) {
+      throw new RuntimeException(s"Failed to archive lfFPGA.a (exit code $arResult)")
+    }
+    println("------------------------------------------------------------------------------------------------------")
+    println(s"Library produced to $targetDir/lfFPGA.a.")
+    println("------------------------------------------------------------------------------------------------------")
+  }
+}
+```
+
+`PYNQZCU104CCWrapper.scala` — override necessário para manter funcionando com o driver legado:
+```scala
+override def platformDriverExtraFlags: Seq[String] = Seq("-fpermissive")
+```
+(`platformMainDriverFile` não precisou de override — o default já encontra `platform-zedboard-linux.cpp` automaticamente, por ser o único `.cpp` na lista desse wrapper)
+
+#### Armadilha de implementação: contexto do Builder do Chisel
+
+Uma primeira tentativa desta refatoração falhou com:
+```
+java.lang.IllegalArgumentException: requirement failed: must be inside Builder context
+```
+
+**Causa**: `PlatformWrapper` estende `Module` do Chisel. Construir uma instância de `Module` só é permitido **dentro** do contexto de elaboração aberto internamente por `emitVerilog` — passar `platformInstFxn(...)` como argumento por nome (como no código original) funciona porque a expressão só é avaliada dentro desse contexto; extrair isso para uma `val` **antes** da chamada de `emitVerilog` quebra essa garantia.
+
+**Solução**: usar uma `var` externa, atribuída **dentro** do bloco passado por nome ao `emitVerilog` (`var platformWrapperInst: PlatformWrapper = null` + atribuição dentro do bloco `{...}`). A construção do módulo continua acontecendo dentro do Builder; a referência fica disponível depois, para leitura de `def`s simples, que não criam novo hardware.
+
+### 8.5 Validação de coexistência (o teste decisivo)
+
+Dois testes, no mesmo `mainCodesign`, sem nenhuma edição entre eles:
+
+**`PYNQZCU104CC`** (driver legado, flag `-fpermissive`):
+```
+lfFPGA.a: 37124 bytes
+ar t → platform-zedboard-linux.o
+[warnings de truncamento de ponteiro aparecem, como esperado]
+```
+
+**`ZCU106`** (driver novo, sem flags):
+```
+Compiling driver: platform-mpsoc-uio.cpp (flags: )
+lfFPGA.a: 40494 bytes
+ar t → platform-mpsoc-uio.o
+[nenhum warning]
+```
+
+**Critério de generalização atingido**: adicionar uma placa nova a partir daqui significa criar um `NovaPlacaWrapper.scala`, registrar em `platformMap`/`fpgaPartMap`, e reempacotar — **sem nenhuma edição em `mainCodesign`**.
+
+---
+
+## 9. Checklist de estado atual
 
 **Concluído:**
 - [x] Descoberto e documentado o mecanismo `fpgaBoard` no `target Codesign`
@@ -368,10 +558,250 @@ Caso o driver `LinuxPhysRegDriver`/`/dev/mem` se mostre bloqueado por `CONFIG_ST
 - [x] `mainCodesign`/`Main.scala` corrigido no template-fonte do compilador
 - [x] `./gradlew installDist` validado (reempacotamento funcional, sem rebuild completo)
 - [x] Geração de `lfFPGA.a` nativa confirmada em projeto limpo, com um único comando `lfc`
+- [x] Fase 1 — `ZCU106Wrapper.scala` com identidade própria, registrado em `platformMap`/`fpgaPartMap`
+- [x] Fase 2 — `UioDriver` adotado como driver canônico de 64 bits para a família MPSoC
+- [x] Fase 3 — `mainCodesign` genérico, lendo driver/flags da instância do wrapper (sem hardcode)
+- [x] Coexistência validada: `PYNQZCU104CC` (driver legado + flag) e `ZCU106` (driver novo, sem flags) lado a lado, sem editar `mainCodesign`
 
 **Pendente:**
-- [ ] Corrigir endereços hardcoded em `platform-zedboard-linux.cpp` para os valores reais da ZCU106 (seção 6.5)
+- [ ] Corrigir endereços hardcoded em `platform-zedboard-linux.cpp` para os valores reais da ZCU106 (seção 6.5) — só relevante se o driver legado continuar em uso; `ZCU106`/`UioDriver` já usa endereço configurável via macro
 - [ ] Confirmar `CONFIG_STRICT_DEVMEM` no kernel da placa
 - [ ] Implementar/configurar `ZYNQ_BITFILE_LOADER`
 - [ ] Automatizar a compilação do software para plataformas reais (hoje ainda manual, seção 6.3)
 - [ ] Gerar bitstream via Vivado e validar na placa física
+- [ ] Teste de validação final: criar uma placa fictícia do zero, tocando em um único arquivo, para confirmar o critério de generalização na prática (ver seção 10)
+
+---
+
+## 10. Teste de validação — placa fictícia "TESTBOARD"
+
+Objetivo: provar objetivamente que o critério de generalização foi atingido — adicionar uma placa nova sem editar `mainCodesign`.
+
+### 10.1 Regra do teste
+
+Só é permitido:
+1. Criar **um único arquivo novo**: `TestboardWrapper.scala`.
+2. Adicionar **duas linhas** em `fpgatidbits/Main.scala` (`platformMap` e `fpgaPartMap`) — necessário porque o registro é centralizado nesse mapa; não é uma exceção ao critério, é o "custo mínimo" inerente de registrar qualquer placa nova.
+3. Reempacotar (`installDist`).
+
+**Não é permitido** tocar em `mainCodesign`, `PlatformWrapper.scala`, ou qualquer wrapper existente.
+
+### 10.2 `TestboardWrapper.scala`
+
+Reaproveita o driver `UioDriver` (já genérico, seção 8.3) — prova que o driver também não precisa ser reescrito para uma placa nova do mesmo chip.
+
+```scala
+package fpgatidbits.PlatformWrapper
+import chisel3._
+import fpgatidbits.TidbitsMakeUtils._
+object TestboardParams extends PlatformWrapperParams {
+  val platformName = "TESTBOARD"
+  val memAddrBits = 32
+  val memDataBits = 64
+  val memIDBits = 6
+  val memMetaBits = 1
+  val numMemPorts = 1
+  val sameIDInOrder = true
+  val typicalMemLatencyCycles = 32
+  val burstBeats = 8
+  val coherentMem = true
+}
+class TestboardWrapper(instFxn: PlatformWrapperParams => GenericAccelerator, targetDir: String)
+  extends AXIPlatformWrapper(PYNQZCU104Params, instFxn) {
+  val platformDriverFiles = baseDriverFiles ++ Array[String](
+    "platform-mpsoc-uio.cpp", "uiodriver.hpp"
+  )
+  suggestName("TestboardWrapper")
+  mem(0).readAddr.bits.cache := "b1100".U
+  mem(0).writeAddr.bits.cache := "b1100".U
+  mem(0).readAddr.bits.prot := "b10".U
+  mem(0).writeAddr.bits.prot := "b10".U
+  generateRegDriver(targetDir)
+  resourceCopyBulk("cpp/platform-wrapper-regdriver/", targetDir, platformDriverFiles)
+  println(s"=======> Driver files copied to ${targetDir}")
+}
+```
+
+### 10.3 Registro (as duas linhas permitidas)
+
+Em `platformMap`:
+```scala
+"TESTBOARD" -> {(f, targetDir) => new TestboardWrapper(f, targetDir)},
+```
+
+Em `fpgaPartMap`:
+```scala
+"TESTBOARD" -> "xczu7ev-ffvc1156-2-e",
+```
+
+### 10.4 Reempacotar e testar
+
+```bash
+cd /opt/lingua-franca
+./gradlew installDist
+```
+
+```bash
+cd ~
+cat > teste_testboard.lf << 'EOF'
+target Codesign {
+  fpgaBoard: TESTBOARD
+}
+reactor Fpga {
+  input in: {= UInt(32.W) =}
+  output out: {= UInt(32.W) =}
+  reaction(in) -> out {=
+    lf_set(out, lf_get(in))
+  =}
+}
+reactor Sw {
+  input in: uint32_t
+  output out: uint32_t
+  reaction(startup) -> out {= out.set(1); =}
+  reaction(in) {= std::cout << "Got: " << *in.get() << std::endl; =}
+}
+main reactor {
+  @fpga
+  fpga = new Fpga()
+  sw = new Sw()
+  sw.out, fpga.out -> fpga.in, sw.in
+}
+EOF
+lfc teste_testboard.lf
+ls -la ~/codesign-gen/teste_testboard/src-gen/hardware/_FpgaTop/build/lfFPGA.a
+ar t ~/codesign-gen/teste_testboard/src-gen/hardware/_FpgaTop/build/lfFPGA.a
+```
+
+### 10.5 Critério de sucesso
+
+- `TestboardWrapper.v` gerado (não `ZCU106Wrapper.v` nem `PYNQZCU104CCWrapper.v`).
+- `Compiling driver: platform-mpsoc-uio.cpp (flags: )` aparece no log — confirma que `mainCodesign` leu o driver certo sem nenhuma edição nele.
+- `lfFPGA.a` gerado, contendo `platform-mpsoc-uio.o`.
+- Testes A e B da seção 8.5 (`PYNQZCU104CC` e `ZCU106`) continuam passando sem re-teste necessário, já que `mainCodesign` não foi tocado nesta seção.
+
+Se os quatro itens acima se confirmarem, o critério de generalização está objetivamente demonstrado: uma placa nova exige apenas um arquivo de wrapper + duas linhas de registro, nunca uma edição no orquestrador de build.
+
+---
+
+## 11. Simular com Verilator antes de gerar o bitstream
+
+Como o `mainCodesign` foi reescrito nas Fases 1-3, era necessário confirmar que o caminho de **simulação** (`VerilatedTester`) continuou funcionando sem regressão — ele passa pelo mesmo método, só que pelo ramo `if` em vez do `else`.
+
+### 11.1 Por que simular antes de ir para hardware real
+
+O reactor `Fpga`/`Sw` escrito em `.lf` é **o mesmo código-fonte**, independente da plataforma escolhida em `fpgaBoard`. Só a "casca" AXI/driver muda entre `VerilatedTester` e uma placa real. Isso significa que trocar só o `fpgaBoard` permite:
+
+1. Validar a lógica do reactor via simulação (rápido, sem precisar de bitstream nem placa física).
+2. Trocar `fpgaBoard: VerilatedTester` → `fpgaBoard: ZCU106` (ou outra placa) só depois que a lógica já está correta — isolando bugs de lógica de bugs de plataforma/hardware.
+
+### 11.2 Teste de regressão realizado
+
+Reaproveitando o mesmo `.lf` original (`Fpga`/`Sw` com timer de 1ms e incremento controlado), trocando só o `fpgaBoard`:
+
+```lf
+target Codesign {
+  fpgaBoard: VerilatedTester
+}
+reactor Fpga {
+  input in: {= UInt(32.W) =}
+  output out: {= UInt(32.W) =}
+  timer t (0, 1 msec)
+  state cnt: {= UInt(32.W) =}
+  state inc: {= UInt(32.W) =}
+  reaction(in) {=
+    printf("Got inc=%d\n", lf_get(in))
+    lf_write(inc, lf_get(in))
+  =}
+  reaction(t) -> out {=
+    val next = lf_read(cnt) + lf_read(inc)
+    printf("Update count to=%d\n", next)
+    lf_set(out, next)
+    lf_write(cnt, next)
+  =}
+}
+reactor Sw {
+  input in: uint32_t
+  output out: uint32_t
+  logical action a
+  reaction(startup) -> a, out {=
+    out.set(2);
+    a.schedule(10ms);
+  =}
+  reaction(a) -> out {=
+    out.set(4);
+  =}
+  reaction(in) {=
+    std::cout <<"Got: " <<*in.get() <<" @ " <<get_elapsed_logical_time() <<std::endl;
+  =}
+}
+main reactor {
+  @fpga
+  fpga = new Fpga()
+  sw = new Sw()
+  sw.out, fpga.out -> fpga.in, sw.in
+}
+```
+
+```bash
+lfc teste_verilator_regressao.lf
+ls -la ~/codesign-gen/teste_verilator_regressao/src-gen/hardware/_FpgaTop/build/lfFPGA.a
+```
+
+`lfFPGA.a` de **635890 bytes** (bem maior que os ~37-40KB dos builds para hardware real — esperado, já que aqui o `.a` contém o RTL inteiro compilado como C++ pelo Verilator, não só o driver).
+
+### 11.3 Execução
+
+O binário do software gerado por `lfc` segue o nome do `main reactor` (sem nome explícito no `.lf`, usa o padrão `_SwTop`), não o nome do arquivo `.lf`:
+
+```bash
+cd ~/codesign-gen/teste_verilator_regressao
+./bin/_SwTop
+```
+
+Saída confirmada:
+```
+[INFO]  Attached to FPGA Reactor with Signature: aeef7c29
+Got inc=         2
+Update count to=         2
+Got: 2 @ 0 nsecs
+Update count to=         4
+Got: 4 @ 1000000 nsecs
+...
+Got inc=         4
+Update count to=        24
+...
+```
+
+**Sem regressão**: assinatura correta, contagem incrementando certinho, tags lógicas avançando em passos de 1ms — comportamento idêntico ao observado antes das Fases 1-3.
+
+### 11.4 Fluxo de trabalho recomendado (simular → hardware real)
+
+```bash
+# 1. Simular primeiro — valida a lógica do reactor
+cat > meu_projeto.lf << 'EOF'
+target Codesign {
+  fpgaBoard: VerilatedTester
+}
+# ... reactors Fpga/Sw ...
+EOF
+lfc meu_projeto.lf
+cd ~/codesign-gen/meu_projeto
+./bin/_SwTop   # Ctrl+C para interromper (roda indefinidamente se houver timer sem fim)
+```
+
+```bash
+# 2. Depois que a lógica estiver validada, trocar só o fpgaBoard
+sed -i 's/fpgaBoard: VerilatedTester/fpgaBoard: ZCU106/' meu_projeto.lf
+cd ~
+rm -rf codesign-gen/meu_projeto/src-gen/hardware/_FpgaTop/build codesign-gen/meu_projeto/src-gen/hardware/_FpgaTop/target
+lfc meu_projeto.lf
+# gera lfFPGA.a para hardware real, sem precisar re-simular a lógica
+```
+
+```bash
+# 3. Compilar o software cross-compilado, linkando com o lfFPGA.a real
+cd codesign-gen/meu_projeto/src/software
+lfc --target-compiler aarch64-linux-gnu-g++ <NomeDoSwTop>.lf
+```
+
+**Nota**: a etapa 3 continua sendo manual para plataformas reais (seção 6.3) — só a etapa de simulação (1) compila e roda o software automaticamente, por causa da condição `if (fpgaBoard.equals("VerilatedTester"))` no `CodesignGenerator.kt` (seção 2).
