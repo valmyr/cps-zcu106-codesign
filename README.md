@@ -167,6 +167,12 @@ lfc ./src/HelloWorld.lf
 
 ---
 
+### 3. Cross-Compile ARM
+```bash
+ lfc --target-compiler aarch64-linux-gnu-g++ main_target_board.lf
+
+```
+
 ## Referências
 
 ### Cursos e tutoriais
