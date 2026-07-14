@@ -15,6 +15,7 @@ RUN apt-get update && apt-get install -y \
     wget \
     unzip \
     zip \
+    file \
     vim \
     nano \
     sed \
@@ -724,6 +725,32 @@ void deinitPlatform(WrapperRegDriver *driver) {
   }
 }
 EOF
+###############################################################################
+# CodesignGenerator.kt — compila o software automaticamente para QUALQUER
+# placa, não só VerilatedTester (simulação).
+#
+# Original: só compilava o software gerado quando fpgaBoard == "VerilatedTester",
+# exigindo um passo manual extra (lfc --target-compiler ... _SwTop.lf) para
+# qualquer placa real. Esta edição remove essa restrição: swEmitter.compile()
+# roda sempre, usando o --target-compiler passado na linha de comando do lfc
+# (ou o compilador nativo do sistema, se nenhum for especificado).
+###############################################################################
+
+RUN python3 << 'PYEOF'
+path = 'core/src/main/kotlin/org/lflang/generator/codesign/CodesignGenerator.kt'
+with open(path) as f:
+    content = f.read()
+
+anchor = 'if (targetConfig.fpgaBoard.equals("VerilatedTester")) {'
+patch = 'if (true) { // PATCHED: always compile software, regardless of fpgaBoard (see backlog)'
+
+assert content.count(anchor) == 1, 'anchor not found exactly once in CodesignGenerator.kt'
+content = content.replace(anchor, patch, 1)
+
+with open(path, 'w') as f:
+    f.write(content)
+print('CodesignGenerator.kt patched OK')
+PYEOF
 
 ###############################################################################
 # fpgatidbits/Main.scala — registro de ZCU106 no platformMap e fpgaPartMap
@@ -752,6 +779,42 @@ with open(path, 'w') as f:
     f.write(content)
 print('fpgatidbits/Main.scala patched OK')
 PYEOF
+
+###############################################################################
+# CodesignSwEmitter.kt — propaga --target-compiler para o .lf de software
+# gerado internamente.
+#
+# CodesignSwEmitter.compile() cria um novo MainContext/TargetConfig do zero,
+# usando Properties() vazio como cliArgs -- isso descarta qualquer
+# --target-compiler passado na linha de comando original do lfc. O novo
+# TargetConfig só é reconstruído a partir do que está ESCRITO no arquivo
+# _SwTop.lf gerado (via TargetProperty.COMPILER, keyword "compiler" no .lf).
+# Esta correção faz generateTarget() escrever essa diretiva no .lf gerado,
+# propagando o compilador certo através dessa segunda passada de geração.
+###############################################################################
+
+RUN python3 << 'PYEOF'
+path = 'core/src/main/kotlin/org/lflang/generator/codesign/CodesignSwEmitter.kt'
+with open(path) as f:
+    content = f.read()
+
+anchor = '''        if (targetConfig.cmakeBuildType != null) {
+            builder.appendLine("  build-type: ${targetConfig.cmakeBuildType.name},")
+        }'''
+
+patch = anchor + '''
+        if (targetConfig.compiler.isNotEmpty()) {
+            builder.appendLine("  compiler: \\"${targetConfig.compiler}\\",")
+        }'''
+
+assert content.count(anchor) == 1, 'anchor not found exactly once in CodesignSwEmitter.kt'
+content = content.replace(anchor, patch, 1)
+
+with open(path, 'w') as f:
+    f.write(content)
+print('CodesignSwEmitter.kt patched OK')
+PYEOF
+
 
 # O mesmo arquivo também existe em core/build/resources/main/... (gerado
 # pelo processamento de resources do gradle a partir do diretório acima).
@@ -827,6 +890,11 @@ RUN RUNZSH=no \
     CHSH=no \
     KEEP_ZSHRC=yes \
     sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+###############################################################################
+# Tema do Oh My Zsh
+###############################################################################
+
+RUN sed -i 's/^ZSH_THEME=.*/ZSH_THEME="jonathan"/' ~/.zshrc
 
 ###############################################################################
 # Copia exemplos
@@ -837,5 +905,38 @@ RUN mkdir -p ~/test && \
 
 WORKDIR /home/lingua-franca 
 RUN git clone https://github.com/erlingrj/reactor-chisel-benchmarks.git
+RUN mkdir -p /tmp/smoketest4 && cat > /tmp/smoketest4/smoke4.lf <<'EOF'
+target Codesign {
+  fpgaBoard: ZCU106
+}
+reactor Fpga {
+  input in: {= UInt(32.W) =}
+  output out: {= UInt(32.W) =}
+  reaction(in) -> out {=
+    lf_set(out, lf_get(in))
+  =}
+}
+reactor Sw {
+  input in: uint32_t
+  output out: uint32_t
+  reaction(startup) -> out {= out.set(1); =}
+  reaction(in) {= std::cout << "Got: " << *in.get() << std::endl; =}
+}
+main reactor {
+  @fpga
+  fpga = new Fpga()
+  sw = new Sw()
+  sw.out, fpga.out -> fpga.in, sw.in
+}
+EOF
 
+RUN cd /tmp/smoketest4 && \
+    export PATH=/opt/lingua-franca/build/install/lf-cli/bin:$PATH && \
+    lfc --target-compiler aarch64-linux-gnu-g++ smoke4.lf && \
+    file codesign-gen/smoke4/bin/_SwTop | grep -q "ARM aarch64" && \
+    echo "SMOKE TEST 4 PASSED - software compiled automatically for ZCU106" && \
+    rm -rf /tmp/smoketest4
+
+RUN grep -q 'ZSH_THEME="jonathan"' ~/.zshrc && echo "Tema jonathan configurado com sucesso" || (echo "ERRO: tema nao foi aplicado" && exit 1)
+    
 CMD ["/bin/zsh"]
