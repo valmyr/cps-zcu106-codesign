@@ -19,7 +19,7 @@ compiler:
 
 deploy: compiler
         @printf "$(VERDE)Encapsulando implementacao Software e Hardware...$(RESET)\n"
-        tar -czf ./$(PROJETO)_$(TIMESTAMP)_deploy.tar.gz \
+        tar -czf ./$(basename $(PROJETO))_$(TIMESTAMP)_deploy.tar.gz \
                 ./codesign-gen/$(basename $(PROJETO))/src-gen/hardware/_FpgaTop/build/ZCU106Wrapper.v \
                 ./codesign-gen/$(basename $(PROJETO))/lib \
                 ./bin/$(basename $(PROJETO))
