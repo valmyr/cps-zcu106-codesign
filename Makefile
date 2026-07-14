@@ -12,20 +12,20 @@ TIMESTAMP := $(shell date +%Y%m%d_%H%M)
 all: deploy
 
 compiler:
-	@printf "$(VERDE)Compilando Reatores...$(RESET)\n"
-	@printf "$(VERMELHO)lfc --target-compiler=aarch64-linux-gnu-g++ $(PROJETO)$(RESET)\n"
-	lfc --target-compiler=aarch64-linux-gnu-g++ $(PROJETO)
-	@printf "$(VERDE)Fim do processo$(RESET)\n"
+        @printf "$(VERDE)Compilando Reatores...$(RESET)\n"
+        @printf "$(VERMELHO)lfc --target-compiler=aarch64-linux-gnu-g++ $(PROJETO)$(RESET)\n"
+        lfc --target-compiler=aarch64-linux-gnu-g++ $(PROJETO)
+        @printf "$(VERDE)Fim do processo$(RESET)\n"
 
 deploy: compiler
-	@printf "$(VERDE)Encapsulando implementacao Software e Hardware...$(RESET)\n"
-	tar -czf ./$(PROJETO)_$(TIMESTAMP)_deploy.tar.gz \
-		./codesign-gen/$(PROJETO)/src-gen/hardware/_FpgaTop/build/ZCU106Wrapper.v \
-		./codesign-gen/$(PROJETO)/lib \
-		./bin/$(PROJETO)
-	@printf "$(VERMELHO)Fim do encapsulamento$(RESET)\n"
+        @printf "$(VERDE)Encapsulando implementacao Software e Hardware...$(RESET)\n"
+        tar -czf ./$(PROJETO)_$(TIMESTAMP)_deploy.tar.gz \
+                ./codesign-gen/$(basename $(PROJETO))/src-gen/hardware/_FpgaTop/build/ZCU106Wrapper.v \
+                ./codesign-gen/$(basename $(PROJETO))/lib \
+                ./bin/$(basename $(PROJETO))
+        @printf "$(VERMELHO)Fim do encapsulamento$(RESET)\n"
 
 clean:
-	@printf "$(VERDE)Limpando artefatos...$(RESET)\n"
-	@printf "$(VERMELHO)rm -rf codesign-gen$(RESET)\n"
-	rm -rf codesign-gen
+        @printf "$(VERDE)Limpando artefatos...$(RESET)\n"
+        @printf "$(VERMELHO)rm -rf codesign-gen$(RESET)\n"
+        rm -rf codesign-gen
