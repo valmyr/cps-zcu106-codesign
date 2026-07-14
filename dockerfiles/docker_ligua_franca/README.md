@@ -5,7 +5,7 @@
 
 ## Requisitos
 
-- **Espaço em disco: mínimo de 3 GB livres** antes de iniciar o `docker build`.
+- **Espaço em disco: mínimo de 15 GB livres** antes de iniciar o `docker build`.
   Esse valor cobre a imagem base + JDK 17 + toolchain do gradle/sbt. Ele
   **não** inclui o que o sbt baixa na primeira compilação de um target
   Codesign real (`chisel3`/`chiseltest`/Scala e dependências transitivas -
@@ -327,7 +327,7 @@ ssh -p 2222 lingua-franca@localhost    # senha: 1234
 Se preferir não deixar o container em background, `-it --rm` também
 funciona normalmente - o `sshd` sobe do mesmo jeito antes do `CMD`.
 
-ESPAÇO EM DISCO: não medimos o uso exato, mas conte com **no mínimo 3 GB**
+ESPAÇO EM DISCO: não medimos o uso exato, mas conte com **no mínimo 15 GB**
 para a imagem base + JDK 17 + toolchain do gradle/sbt, mais o que o sbt
 baixar na primeira compilação de um target Codesign (item 5) -
 `chisel3`/`chiseltest`/Scala trazem bastante coisa transitiva. Não é da
