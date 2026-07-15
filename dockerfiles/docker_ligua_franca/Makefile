@@ -7,27 +7,26 @@ ARCH ?= arm
 TIMESTAMP := $(shell date +%Y%m%d_%H%M)
 
 ifeq ($(ARCH),arm)
-	TARGET_COMPILER := aarch64-linux-gnu-g++
-	MODO := deploy
+    TARGET_COMPILER := aarch64-linux-gnu-g++
+    MODO := deploy
 else ifeq ($(ARCH),x86_64)
-	TARGET_COMPILER := g++
-	MODO := simulacao
+    TARGET_COMPILER := g++
+    MODO := simulacao
 else
-	$(error ARCH inválido: '$(ARCH)'. Use ARCH=arm ou ARCH=x86_64)
+    $(error ARCH inválido: '$(ARCH)'. Use ARCH=arm ou ARCH=x86_64)
 endif
 
 .PHONY: all compiler deploy clean check-string
 
-check-string:clean
+check-string: clean
 	@if [ "$(MODO)" = "simulacao" ]; then \
-		printf "$(VERDE)Modo simulacao detectado no arquivo!$(RESET)\n"; \
-		printf "$(VERMELHO)Remova o target fpgaboard do projeto .lf$(RESET)\n"; \
+		printf "$(VERDE)Modo simulação detectado no arquivo!$(RESET)\n"; \
 		if [ "$(ARCH)" != "x86_64" ]; then \
-			printf "$(VERMELHO)ERRO: arquivo indica modo simulacao, mas ARCH=$(ARCH). Use ARCH=x86_64$(RESET)\n"; \
+			printf "$(VERMELHO)ERRO: arquivo indica modo simulação, mas ARCH=$(ARCH). Use ARCH=x86_64$(RESET)\n"; \
 			exit 1; \
 		fi; \
 	else \
-		printf "$(VERMELHO)Modo implementacaoo em FPGA detectado!$(RESET)\n"; \
+		printf "$(VERMELHO)Modo implementação em FPGA detectado!$(RESET)\n"; \
 		if [ "$(ARCH)" != "arm" ]; then \
 			printf "$(VERMELHO)ERRO: arquivo indica FPGA, mas ARCH=$(ARCH). Use ARCH=arm$(RESET)\n"; \
 			exit 1; \
@@ -44,14 +43,18 @@ compiler: check-string
 
 deploy: compiler
 	@if [ "$(MODO)" = "simulacao" ]; then \
-		printf "$(AMARELO)Modo simulacao detectado deploy (empacotamento) nao sera executado.$(RESET)\n"; \
+		printf "$(AMARELO)Modo simulação detectado — deploy (empacotamento) não será executado.$(RESET)\n"; \
 	else \
 		printf "$(VERDE)Encapsulando implementacao Software e Hardware...$(RESET)\n"; \
+		printf "$(VERDE)Copiando arquivos Verilog...$(RESET)\n"; \
+		cp ./codesign-gen/$(basename $(PROJETO))/src-gen/hardware/_FpgaTop/build/ZCU106Wrapper.v . ; \
+		printf "$(VERDE)Copiando arquivos da biblioteca...$(RESET)\n"; \
+		cp -r ./codesign-gen/$(basename $(PROJETO))/lib . ; \
+		printf "$(VERDE)Compactando...$(RESET)\n"; \
 		tar -czf ./$(basename $(PROJETO))_$(TIMESTAMP)_deploy.tar.gz \
-			./codesign-gen/$(basename $(PROJETO))/src-gen/hardware/_FpgaTop/build/ZCU106Wrapper.v \
-			./codesign-gen/$(basename $(PROJETO))/lib \
-			./bin/$(basename $(PROJETO)) \
-			./$(PROJETO);\
+			./ZCU106Wrapper.v \
+			./lib \
+			./bin/$(basename $(PROJETO)); \
 		printf "$(VERMELHO)Fim do encapsulamento$(RESET)\n"; \
 	fi
 
