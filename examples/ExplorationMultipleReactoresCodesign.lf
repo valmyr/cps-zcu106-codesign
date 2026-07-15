@@ -1,0 +1,76 @@
+target Codesign {
+    #  fpgaBoard: ZCU106,
+      clock-period: 10 nsec
+    }
+    reactor R0_Fpga {
+      input A: {= UInt(32.W) =}
+      input B: {= UInt(32.W) =}
+      output C: {= UInt(32.W) =}
+      reaction(A, B) -> C {=
+        lf_set(C, lf_get(A) + lf_get(B))
+      =}
+    }
+    
+    reactor R1_Fpga {
+      input C: {= UInt(32.W) =}
+      output D: {= UInt(32.W) =}
+      reaction(C) -> D {=
+        lf_set(D, lf_get(C))
+      =}
+    }
+    
+    
+    reactor Hardware {
+    
+      input A: {= UInt(32.W) =}
+      input B: {= UInt(32.W) =}
+      output C: {= UInt(32.W) =}
+      output D: {= UInt(32.W) =}
+    
+    
+      r0 = new R0_Fpga()
+      r1 = new R1_Fpga()
+    
+      A -> r0.A
+      B -> r0.B
+      r0.C -> r1.C
+      r1.D -> D
+      r0.C -> C
+    
+    
+    }
+    
+    reactor Software {
+      input C: uint32_t
+      input D: uint32_t
+      output A: uint32_t
+      output B: uint32_t
+      
+      state cnt0: uint32_t = 0
+      state cnt1: uint32_t = 0
+
+      timer t (0, 20 msec)
+
+      reaction(startup){=
+        std::cout<<"\033[1;32mStart of the \033[0m"<<"\033[1;33mExploration Multiple Reactors Codesign\033[0m"<<"\033[1;32mproject designed by ValmyrSilva07 for Codesing..."<<"\033[0m"<<std::endl;
+      =}
+      reaction(t) -> A,B{=
+          cnt0+=1;
+          cnt1+=2;
+          A.set(cnt0);
+          B.set(cnt1);
+          std::cout<< *A.get()<< "+"<< *B.get()<< "= ";
+      =}
+      reaction(C) {=
+        std::cout<<*C.get()<<std::endl;
+      =}
+    
+    }
+    main reactor {
+      @fpga
+      fpga = new Hardware()
+      sw = new Software()
+      fpga.C,fpga.D -> sw.C,sw.D
+      sw.A,sw.B -> fpga.A,fpga.B
+    }
+    
