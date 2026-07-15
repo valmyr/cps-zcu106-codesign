@@ -269,6 +269,74 @@ de você só descobrir o problema na primeira vez que usar o container:
 | 3 | Geração de `lfFPGA.a` para hardware real (`ZCU106`), confirmando `platform-mpsoc-uio.o` presente no arquivo, sem warnings de compilação. |
 | 4 | **Compilação automática do software** para `ZCU106` com um único comando (`lfc --target-compiler aarch64-linux-gnu-g++ arquivo.lf`, sem segundo passo manual), confirmando `ELF ... ARM aarch64` no binário final. |
 
+## Makefile de automação (compilação, empacotamento e detecção simulação/FPGA)
+
+A imagem já sai com um `Makefile` pronto em `/home/lingua-franca/Makefile`
+(`WORKDIR` do usuário `lingua-franca`) — ele é gerado **durante o
+`docker build`**, via heredoc (`RUN cat <<'EOF' > Makefile ... EOF`), não é
+copiado de um arquivo externo. Ou seja, todo container criado a partir desta
+imagem já tem o `make` disponível para compilar/empacotar sem precisar
+lembrar dos comandos completos do `lfc`.
+
+### Variáveis
+
+| Variável | Padrão | Descrição |
+|---|---|---|
+| `PROJETO` | `loopback` | Nome do arquivo `.lf` (sem extensão de caminho) a compilar. Também usado para nomear a pasta gerada em `codesign-gen/` e o pacote final. |
+| `ARCH` | `arm` | Arquitetura alvo do compilador. Aceita `arm` (usa `aarch64-linux-gnu-g++`) ou `x86_64` (usa `g++` nativo). Qualquer outro valor faz o `make` abortar com `$(error ...)`. |
+
+### Detecção automática: simulação vs. FPGA
+
+O Makefile lê o arquivo `./$(PROJETO)` e procura a string `fpgaboard` nele
+(via `grep`, uma única vez, no momento em que o Make é invocado):
+
+- **Contém `fpgaboard`** → `MODO=simulacao` → espera `ARCH=x86_64`.
+- **Não contém** → `MODO=fpga` → espera `ARCH=arm`.
+
+Se o `ARCH` passado não bater com o modo detectado no arquivo, o target
+`check-string` (pré-requisito de `compiler`) aborta com `exit 1` antes de
+chamar o `lfc` — evita compilar para a arquitetura errada por engano.
+
+### Targets
+
+| Target | O que faz |
+|---|---|
+| `check-string` | Detecta o modo (simulação/FPGA) e valida contra `ARCH`. Roda automaticamente antes de `compiler`. |
+| `compiler` | Roda `lfc --target-compiler=<compilador> $(PROJETO)` (hardware + software, ver item 9 acima). |
+| `deploy` | Roda `compiler` e, **somente se `MODO=fpga`**, empacota `ZCU106Wrapper.v` + `lib/` + o binário em `./<projeto>_<timestamp>_deploy.tar.gz`. Em modo simulação, só avisa e não gera pacote (não faz sentido empacotar hardware/bitstream de uma rodada simulada). |
+| `all` | Alias para `deploy` (target padrão, executado com `make` sem argumentos). |
+| `clean` | Remove a pasta `codesign-gen/` (artefatos gerados pelo `lfc`). |
+
+### Exemplos de uso
+
+```bash
+# Dentro do container, a partir de /home/lingua-franca
+
+# Simulação (arquivo .lf com fpgaBoard: VerilatedTester/fpgaboard) em x86_64
+make deploy PROJETO=meu_teste.lf ARCH=x86_64
+# -> compila, mas pula o empacotamento (avisa em amarelo)
+
+# Implementação real em FPGA (ex.: ZCU106), cross-compilando para ARM
+make deploy PROJETO=meu_teste.lf ARCH=arm
+# -> compila e gera meu_teste_<timestamp>_deploy.tar.gz
+
+# Só compilar, sem empacotar
+make compiler PROJETO=meu_teste.lf ARCH=arm
+
+# ARCH incompatível com o conteúdo do arquivo -> aborta antes de compilar
+make compiler PROJETO=meu_teste.lf ARCH=x86_64   # se o arquivo NÃO tiver fpgaboard
+# ERRO: arquivo indica FPGA, mas ARCH=x86_64. Use ARCH=arm
+
+# Limpar artefatos gerados
+make clean
+```
+
+**Atenção:** o `PROJETO` referenciado pelo `grep` (`./$(PROJETO)`) precisa
+ser um caminho legível relativo ao diretório onde o `make` é executado —
+normalmente o próprio arquivo `.lf`. Se o `.lf` estiver em outra pasta (por
+exemplo, dentro do volume montado — ver seção seguinte), rode o `make` a
+partir de lá ou passe `PROJETO=caminho/relativo/arquivo.lf`.
+
 ## COMO USAR
 ```bash
 docker build -t lf-chisel .
@@ -326,6 +394,67 @@ ssh -p 2222 lingua-franca@localhost    # senha: 1234
 ```
 Se preferir não deixar o container em background, `-it --rm` também
 funciona normalmente - o `sshd` sobe do mesmo jeito antes do `CMD`.
+
+### Pasta compartilhada host ↔ container (bind mount)
+
+Além do `/workspace` usado nos exemplos acima, também é possível montar uma
+pasta dedicada só para os artefatos de deploy (os `.tar.gz` gerados pelo
+`make deploy`), sem misturar com o código-fonte `.lf`:
+
+```bash
+docker run -v $(pwd)/deploy_host:/home/lingua-franca/deploy_container -it lf-chisel zsh
+```
+
+O que esse comando faz:
+
+- **`$(pwd)/deploy_host`** (host): pasta no seu ambiente local, criada
+  automaticamente pelo Docker caso ainda não exista. Fica no diretório onde
+  você rodou o comando.
+- **`/home/lingua-franca/deploy_container`** (container): ponto de montagem
+  dentro do container, no `$HOME` do usuário `lingua-franca` — o mesmo
+  usuário que roda o `zsh` e tem o `Makefile` no diretório logo acima
+  (`/home/lingua-franca`).
+- **`-it ... zsh`**: sobrescreve o `CMD` padrão da imagem e abre o shell
+  interativo diretamente (equivalente ao comportamento default, mas
+  explícito).
+- Qualquer arquivo escrito em um dos dois lados aparece automaticamente no
+  outro - é uma via de mão dupla, não uma cópia única.
+
+**Como usar junto com o `make deploy`:** como o `deploy` do Makefile escreve
+o `.tar.gz` no diretório **atual** (`./`), para que o pacote apareça direto
+em `deploy_host` no seu computador, rode o `make` já dentro da pasta
+montada:
+
+```bash
+# Já dentro do container (zsh aberto pelo docker run acima)
+cd ~/deploy_container
+make deploy PROJETO=/caminho/para/meu_teste.lf ARCH=arm
+```
+
+O `meu_teste_<timestamp>_deploy.tar.gz` resultante fica em
+`~/deploy_container/` dentro do container e, graças ao bind mount, em
+`./deploy_host/` no host - imediatamente acessível fora do Docker, sem
+precisar de `docker cp`.
+
+**Observações:**
+
+- Se você rodar o `make` a partir de `/home/lingua-franca` (fora da pasta
+  montada), o `.tar.gz` fica só dentro do container e some quando ele for
+  removido (a menos que copiado manualmente com `docker cp`).
+- Permissões: o container roda como usuário `lingua-franca` (item 4). Se o
+  seu usuário no host tiver um UID diferente, os arquivos criados dentro de
+  `deploy_host/` a partir do container podem aparecer com dono/grupo
+  numérico "estranho" no host (comportamento normal de bind mounts no
+  Linux) - ainda assim leitura/escrita funcionam, só a exibição do
+  proprietário no `ls -l` do host pode não bater com um usuário nomeado.
+- É possível combinar os dois volumes no mesmo `docker run` (código-fonte em
+  `/workspace` + artefatos em `deploy_container`):
+  ```bash
+  docker run -it --rm \
+    -v "$(pwd)/meus-lf:/workspace" \
+    -v "$(pwd)/deploy_host:/home/lingua-franca/deploy_container" \
+    lf-chisel zsh
+  ```
 
 ESPAÇO EM DISCO: não medimos o uso exato, mas conte com **no mínimo 15 GB**
 para a imagem base + JDK 17 + toolchain do gradle/sbt, mais o que o sbt
