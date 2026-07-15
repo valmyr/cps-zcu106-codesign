@@ -52,7 +52,7 @@ target Codesign {
       timer t (0, 20 msec)
 
       reaction(startup){=
-        std::cout<<"\033[1;32mStart of the \033[0m"<<"\033[1;33mExploration Multiple Reactors Codesign\033[0m"<<"\033[1;32mproject designed by ValmyrSilva07 for Codesing..."<<"\033[0m"<<std::endl;
+        std::cout<<"[INFO]  \033[1;32mStart of the \033[0m"<<"\033[1;33mExploration Multiple Reactors Codesign\033[0m"<<"\033[1;32mproject designed by ValmyrSilva07 for Codesing..."<<"\033[0m"<<std::endl;
       =}
       reaction(t) -> A,B{=
           cnt0+=1;
