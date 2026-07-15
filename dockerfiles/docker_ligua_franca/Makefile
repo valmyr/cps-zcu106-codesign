@@ -6,20 +6,19 @@ PROJETO  ?= loopback
 ARCH ?= arm
 TIMESTAMP := $(shell date +%Y%m%d_%H%M)
 
-# Detecta o modo uma única vez, na leitura do Makefile
-MODO := $(shell grep -q "fpgaboard" ./$(PROJETO) && echo simulacao || echo fpga)
-
 ifeq ($(ARCH),arm)
     TARGET_COMPILER := aarch64-linux-gnu-g++
+    MODO := deploy
 else ifeq ($(ARCH),x86_64)
     TARGET_COMPILER := g++
+    MODO := simulacao
 else
     $(error ARCH inválido: '$(ARCH)'. Use ARCH=arm ou ARCH=x86_64)
 endif
 
 .PHONY: all compiler deploy clean check-string
 
-check-string:
+check-string:clean
 	@if [ "$(MODO)" = "simulacao" ]; then \
 		printf "$(VERDE)Modo simulação detectado no arquivo!$(RESET)\n"; \
 		if [ "$(ARCH)" != "x86_64" ]; then \
