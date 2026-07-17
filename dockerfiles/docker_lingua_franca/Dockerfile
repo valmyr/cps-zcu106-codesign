@@ -943,14 +943,14 @@ WORKDIR /home/lingua-franca
 
 RUN cat <<'EOF' > Makefile
 # Makefile para compilar 
-#Caso I deploy em FPGA: make all PROJETO=loopback.lf ARCH=arm
-#Caso II simulacao	  : make all PROJETO=loopback.lf ARCH=x86_64
+#Caso I deploy em FPGA: make all PROJETO=ExplorationMultipleReactorsCodesignAccelsOpBasics.lf ARCH=arm
+#Caso II simulacao	  : make all PROJETO=ExplorationMultipleReactorsCodesignAccelsOpBasics.lf ARCH=x86_64
 #É necessário especificar a extensão do arquivo; isso é uma escolha arbitrária exclusivamente minha.
 VERMELHO = \033[1;31m
 VERDE    = \033[1;32m
 AMARELO  = \033[1;33m
 RESET    = \033[0m
-PROJETO  ?= loopback.lf
+PROJETO  ?= ExplorationMultipleReactorsCodesignAccelsOpBasics.lf
 ARCH ?= arm
 TIMESTAMP := $(shell date +%Y%m%d_%H%M)
 ifeq ($(ARCH),arm)
@@ -1010,6 +1010,127 @@ clean:
 	@printf "$(VERDE)Limpando artefatos...$(RESET)\n"
 	@printf "$(VERMELHO)rm -rf codesign-gen$(RESET)\n"
 	rm -rf codesign-gen
+EOF
+
+
+RUN cat <<'EOF' > ExplorationMultipleReactorsCodesignAccelsOpBasics.lf
+target Codesign {
+    fpgaBoard: ZCU106,
+    clock-period: 10 nsec,
+    timeout: 1 sec
+  }
+  reactor Accel_Sum {
+    input A: {= UInt(32.W) =}
+    input B: {= UInt(32.W) =}
+    output C: {= UInt(32.W) =}
+    reaction(A, B) -> C {=
+      lf_set(C, lf_get(A) + lf_get(B))
+    =}
+  }
+  
+  reactor Accel_Mult {
+    input C: {= UInt(32.W) =}
+    output D: {= UInt(32.W) =}
+    reaction(C) -> D {=
+      lf_set(D, 4.U * lf_get(C))
+    =}
+  }
+
+  reactor Accel_Subtrac {
+    input A: {= UInt(32.W) =}
+    input B: {= UInt(32.W) =}
+    output C: {= UInt(32.W) =}
+    reaction(A, B) -> C {=
+      lf_set(C, lf_get(B) - lf_get(A))
+    =}
+  }
+  
+  
+  
+  reactor Hardware_ZCU106 {
+  
+    input A: {= UInt(32.W) =}
+    input B: {= UInt(32.W) =}
+    output C: {= UInt(32.W) =}
+    output D: {= UInt(32.W) =}
+    output E: {= UInt(32.W) =}
+  
+  
+    r0 = new Accel_Sum()
+    r1 = new Accel_Mult()
+    r2 = new Accel_Subtrac()
+  
+    A -> r0.A
+    B -> r0.B
+
+    r0.C -> r2.A
+    r1.D -> r2.B
+    
+    r0.C -> r1.C 
+    r2.C -> E
+    r0.C -> C
+    r1.D -> D
+    
+  
+  
+  }
+
+
+  reactor Print_Accels {
+    input C: uint32_t
+    input D: uint32_t
+    input E: uint32_t
+    reaction(C,D,E) {=
+      std::cout<< "[INFO] HW Accel_Subtrac: E = C + D = "<<*E.get()<<std::endl;
+      std::cout<< "[INFO] HW Accel_Sum: C = A - B = "<<*C.get()<<std::endl;
+      std::cout<< "[INFO] HW Accel_Mult: D = 4 * C = "<<*D.get()<<std::endl;
+    =}
+  }
+
+  
+  reactor Software_PetaLinux {
+    input C: uint32_t
+    input D: uint32_t
+    input E: uint32_t
+    output A: uint32_t
+    output B: uint32_t
+  
+    state cnt0: uint32_t = 0
+    state cnt1: uint32_t = 0
+  
+    reaction(startup){=
+      std::cout<<"[INFO]  \033[1;32mStart of the \033[0m"<<"\033[1;33mExploration Multiple Reactors Codesign \033[0m"<<"\033[1;32mproject designed by ValmyrSilva07 for Codesign..."<<"\033[0m"<<std::endl;
+    =}
+  
+    timer t(0,200 nsec)
+    reaction(t) -> A,B{=
+        cnt0+=1;
+        cnt1+=2;
+        A.set(cnt0);
+        B.set(cnt1);
+        std::cout << std::endl<<"[INFO]\033[1;32m SW A = " << *A.get() << ", B = " << *B.get() <<"\033[0m"<< std::endl<<std::endl;
+    =}
+    p3 = new Print_Accels()
+
+
+    C -> p3.C 
+    D -> p3.D 
+    E -> p3.E 
+
+    reaction(shutdown){=
+      std::cout<<"[INFO]  \033[1;32mEnd of the \033[0m"<<"\033[1;33mExploration Multiple Reactors Codesign \033[0m"<<"\033[1;32mproject designed by ValmyrSilva07 for Codesign..."<<"\033[0m"<<std::endl;
+    =}
+
+  }
+  main reactor {
+    @fpga
+    fpga = new Hardware_ZCU106()
+    sw = new Software_PetaLinux()
+    sw.A,sw.B -> fpga.A,fpga.B  after 100 nsec
+    fpga.E,fpga.C,fpga.D -> sw.E ,sw.C,sw.D after 10 usec
+  
+  }
+  
 EOF
 
 CMD ["/bin/zsh"]
