@@ -150,7 +150,9 @@ sdtgen set_dt_param -xsa $xsa -dir $outdir -board_dts zcu106-reva
 sdtgen generate_sdt
 ```
 
-> **Nota:** ajuste `zcu106-reva` para o identificador correspondente à sua placa, caso não esteja usando uma ZCU106.
+> **Nota:** Mais detalhes sobre o TCL em [TCL File Mode - Xilinx System-Device-Tree-xlnx](https://github.com/Xilinx/system-device-tree-xlnx/blob/master/README.md).
+
+> **Nota:** Ajuste `zcu106-reva` para o identificador correspondente à sua placa, caso não esteja usando uma ZCU106.
 
 <p align="center">
 <img title="Conteúdo do script sdt.tcl" alt="Conteúdo do arquivo sdt.tcl aberto no editor" src="../../images/passo10.png" width="100%" height="100%">
