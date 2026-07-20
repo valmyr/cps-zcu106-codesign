@@ -50,6 +50,7 @@ Este tutorial mostra o fluxo completo para gerar uma imagem Linux embarcado (Pet
 - **PetaLinux Tools** 2025.2 instalado (`/petalinux` neste tutorial)
 - BSP da placa alvo (neste exemplo, **ZCU106**)
 - Ambiente Linux com espaço em disco suficiente (o build do Yocto pode passar de 50 GB) e, de preferência, várias CPUs disponíveis para paralelizar o build
+- Requisito Total de ESPAÇO EM DISCO +200GB
 
 ## Sumário
 
