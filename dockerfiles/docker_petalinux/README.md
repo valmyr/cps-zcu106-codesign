@@ -276,7 +276,7 @@ neofetch
 ```
 
 <p align="center">
-<img title="Verificando núcleos de CPU disponíveis" alt="Saída do neofetch mostrando informações da CPU" src="cpuinfo.png" width="100%" height="100%">
+<img title="Verificando núcleos de CPU disponíveis" alt="Saída do neofetch mostrando informações da CPU" src="../../images/cpuinfo.png" width="100%" height="100%">
 </p>
 
 Neste exemplo, um Intel i9-14900F com 32 núcleos:
