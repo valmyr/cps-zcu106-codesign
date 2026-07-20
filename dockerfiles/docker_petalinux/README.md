@@ -57,6 +57,7 @@ Este tutorial mostra o fluxo completo para gerar uma imagem Linux embarcado (Pet
 7. [Compilar o PetaLinux](#7-compilar-o-petalinux)
 8. [Boot via JTAG / Pen Drive](#8-boot-via-jtag--pen-drive)
 9. [Deploy na FPGA](#9-deploy-na-fpga)
+9. [Links Úteis](#10-links-uteis)
 
 ---
 
@@ -692,7 +693,7 @@ Execute novamente:
 
 > Este tutorial ainda tem margem para melhoria e otimização — contribuições e sugestões são bem-vindas.
 
-## Problemas típicos e links úteis
+## 10. Links Úteis
 
 - [Tutorial ZCU104](https://www.hackster.io/engrinam0077/zcu104-mpsoc-development-petalinux-2024-2-basic-tutorial-c82b8d)
 - ["Build failures" da documentação do RPi Camera FMC](https://rpi.camerafmc.com/en/latest/troubleshooting.html)
