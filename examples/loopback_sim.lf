@@ -1,0 +1,25 @@
+// Loopback mínimo em modo SIMULAÇÃO (Verilator).
+// Mesmo código-fonte do loopback de FPGA: só muda a linha fpgaBoard.
+// Uso:  make compiler PROJETO=examples/loopback_sim.lf ARCH=x86_64
+target Codesign {
+  fpgaBoard: VerilatedTester
+}
+reactor Fpga {
+  input in: {= UInt(32.W) =}
+  output out: {= UInt(32.W) =}
+  reaction(in) -> out {=
+    lf_set(out, lf_get(in))
+  =}
+}
+reactor Sw {
+  input in: uint32_t
+  output out: uint32_t
+  reaction(startup) -> out {= out.set(1); =}
+  reaction(in) {= std::cout << "Got: " << *in.get() << std::endl; =}
+}
+main reactor {
+  @fpga
+  fpga = new Fpga()
+  sw = new Sw()
+  sw.out, fpga.out -> fpga.in, sw.in
+}

@@ -68,7 +68,7 @@ Este tutorial mostra o fluxo completo para gerar uma imagem Linux embarcado (Pet
 Antes de exportar o hardware, confira no gerenciador de fontes do Vivado se o *block design* e os demais arquivos do projeto estão corretos e sem erros pendentes.
 
 <p align="center">
-<img title="Carregando o ambiente Vitis via source" alt="Terminal executando o source do settings.sh do Vitis" src="../../images/passo1.png" width="100%" height="100%">
+<img title="Carregando o ambiente Vitis via source" alt="Terminal executando o source do settings.sh do Vitis" src="../images/passo1.png" width="100%" height="100%">
 </p>
 
 ```bash
@@ -86,7 +86,7 @@ source ~/Music/2025.2/Vitis/settings.sh
 Abra o *Block Design* e valide a arquitetura do sistema (processador, barramentos, IPs periféricos, clocks e resets). É neste momento que se confirma se todos os blocos necessários para o PetaLinux (UART, memória DDR, controlador de armazenamento, etc.) estão presentes e conectados corretamente.
 
 <p align="center">
-<img title="Block Design no Vivado" alt="Block design do Vivado com processador e periféricos conectados" src="../../images/passo2.png" width="100%" height="100%">
+<img title="Block Design no Vivado" alt="Block design do Vivado com processador e periféricos conectados" src="../images/passo2.png" width="100%" height="100%">
 </p>
 
 ## 2. Exportando o Hardware (XSA)
@@ -98,17 +98,17 @@ No Vivado, vá em **File → Export → Export Hardware** e siga o assistente:
 **Passo 1 – Início do assistente de exportação.** Confirme que deseja exportar o hardware do projeto atual.
 
 <p align="center">
-<img title="Assistente de exportação de hardware" alt="Tela inicial do assistente Export Hardware do Vivado" src="../../images/passo3.png" width="100%" height="100%">
+<img title="Assistente de exportação de hardware" alt="Tela inicial do assistente Export Hardware do Vivado" src="../images/passo3.png" width="100%" height="100%">
 </p>
 
 <p align="center">
-<img title="Assistente de exportação de hardware" alt="Segunda tela do assistente Export Hardware" src="../../images/passo4.png" width="100%" height="100%">
+<img title="Assistente de exportação de hardware" alt="Segunda tela do assistente Export Hardware" src="../images/passo4.png" width="100%" height="100%">
 </p>
 
 **Passo 2 – Incluir o bitstream.** Marque a opção **Include Bitstream**, para que o arquivo XSA contenha a configuração completa do FPGA.
 
 <p align="center">
-<img title="Opção Include Bitstream marcada" alt="Tela do assistente com a opção Include Bitstream selecionada" src="../../images/passo5.png" width="100%" height="100%">
+<img title="Opção Include Bitstream marcada" alt="Tela do assistente com a opção Include Bitstream selecionada" src="../images/passo5.png" width="100%" height="100%">
 </p>
 
 **Passo 3 – Escolher o diretório de destino.** Neste exemplo:
@@ -118,7 +118,7 @@ No Vivado, vá em **File → Export → Export Hardware** e siga o assistente:
 ```
 
 <p align="center">
-<img title="Seleção do diretório de exportação" alt="Tela de seleção do diretório onde o XSA será salvo" src="../../images/passo6.png" width="100%" height="100%">
+<img title="Seleção do diretório de exportação" alt="Tela de seleção do diretório onde o XSA será salvo" src="../images/passo6.png" width="100%" height="100%">
 </p>
 
 **Passo 4 – Confirmar a exportação.** Verifique se o arquivo `.xsa` foi gerado no diretório correto:
@@ -130,7 +130,7 @@ ls
 ```
 
 <p align="center">
-<img title="Confirmação do arquivo XSA gerado" alt="Terminal mostrando o arquivo .xsa gerado no diretório de workspace" src="../../images/passo8.png" width="100%" height="100%">
+<img title="Confirmação do arquivo XSA gerado" alt="Terminal mostrando o arquivo .xsa gerado no diretório de workspace" src="../images/passo8.png" width="100%" height="100%">
 </p>
 
 ## 3. Gerar o Software Device Tree (SDT)
@@ -138,7 +138,7 @@ ls
 Crie um script Tcl chamado `sdt.tcl`:
 
 <p align="center">
-<img title="Criando o script sdt.tcl" alt="Editor de texto criando o arquivo sdt.tcl" src="../../images/passo9.png" width="100%" height="100%">
+<img title="Criando o script sdt.tcl" alt="Editor de texto criando o arquivo sdt.tcl" src="../images/passo9.png" width="100%" height="100%">
 </p>
 
 Conteúdo do `sdt.tcl`:
@@ -156,7 +156,7 @@ sdtgen generate_sdt
 > **Nota:** Ajuste `zcu106-reva` para o identificador correspondente à sua placa, caso não esteja usando uma ZCU106.
 
 <p align="center">
-<img title="Conteúdo do script sdt.tcl" alt="Conteúdo do arquivo sdt.tcl aberto no editor" src="../../images/passo10.png" width="100%" height="100%">
+<img title="Conteúdo do script sdt.tcl" alt="Conteúdo do arquivo sdt.tcl aberto no editor" src="../images/passo10.png" width="100%" height="100%">
 </p>
 
 Confirme que o arquivo foi criado com sucesso:
@@ -167,7 +167,7 @@ cat sdt.tcl
 ```
 
 <p align="center">
-<img title="Conferindo o conteúdo do sdt.tcl" alt="Terminal exibindo o conteúdo do sdt.tcl com cat" src="../../images/passo11.png" width="100%" height="100%">
+<img title="Conferindo o conteúdo do sdt.tcl" alt="Terminal exibindo o conteúdo do sdt.tcl com cat" src="../images/passo11.png" width="100%" height="100%">
 </p>
 
 Execute o script com `xsct`, a partir do diretório de workspace:
@@ -189,11 +189,11 @@ xsct sdt.tcl design_1_wrapper.xsa sdt_outdir
 ```
 
 <p align="center">
-<img title="Execução do xsct para gerar o SDT" alt="Terminal executando xsct sdt.tcl" src="../../images/passo12.png" width="100%" height="100%">
+<img title="Execução do xsct para gerar o SDT" alt="Terminal executando xsct sdt.tcl" src="../images/passo12.png" width="100%" height="100%">
 </p>
 
 <p align="center">
-<img title="Saída da geração do Software Device Tree" alt="Terminal mostrando o processamento do sdtgen" src="../../images/passo13.png" width="100%" height="100%">
+<img title="Saída da geração do Software Device Tree" alt="Terminal mostrando o processamento do sdtgen" src="../images/passo13.png" width="100%" height="100%">
 </p>
 
 Ao final, o diretório `sdt_outdir` deve conter os arquivos de device tree gerados a partir do hardware exportado.
@@ -208,7 +208,7 @@ source settings.sh
 ```
 
 <p align="center">
-<img title="Carregando o ambiente PetaLinux" alt="Terminal executando source settings.sh do PetaLinux" src="../../images/passo17.png" width="100%" height="100%">
+<img title="Carregando o ambiente PetaLinux" alt="Terminal executando source settings.sh do PetaLinux" src="../images/passo17.png" width="100%" height="100%">
 </p>
 
 Após o carregamento, volte ao diretório do projeto:
@@ -232,7 +232,7 @@ petalinux-create -t project -s /petalinux/xilinx-zcu106-v2025.2-11160223.bsp
 Após a execução, o diretório base do projeto deve conter a estrutura padrão de um projeto PetaLinux:
 
 <p align="center">
-<img title="Estrutura do projeto PetaLinux criado" alt="Listagem de diretórios do projeto PetaLinux recém-criado" src="../../images/passo18.png" width="100%" height="100%">
+<img title="Estrutura do projeto PetaLinux criado" alt="Listagem de diretórios do projeto PetaLinux recém-criado" src="../images/passo18.png" width="100%" height="100%">
 </p>
 
 ## 5. Incorporar as características do hardware ao PetaLinux
@@ -256,7 +256,7 @@ petalinux-config --get-hw-description ../sdt_outdir
 ```
 
 <p align="center">
-<img title="Importando a descrição de hardware" alt="Terminal executando petalinux-config --get-hw-description" src="../../images/passo19.png" width="100%" height="100%">
+<img title="Importando a descrição de hardware" alt="Terminal executando petalinux-config --get-hw-description" src="../images/passo19.png" width="100%" height="100%">
 </p>
 
 ### 5.1 Threads paralelas de build
@@ -266,7 +266,7 @@ No menu de configuração, acesse:
 **PetaLinux System Configuration → Yocto Settings → Parallel Thread Execution**
 
 <p align="center">
-<img title="Menu de configuração de threads paralelas" alt="Menu ncurses do PetaLinux System Configuration em Yocto Settings" src="../../images/passo20.png" width="100%" height="100%">
+<img title="Menu de configuração de threads paralelas" alt="Menu ncurses do PetaLinux System Configuration em Yocto Settings" src="../images/passo20.png" width="100%" height="100%">
 </p>
 
 Verifique a quantidade de CPUs disponíveis no seu ambiente de trabalho:
@@ -276,19 +276,19 @@ neofetch
 ```
 
 <p align="center">
-<img title="Verificando núcleos de CPU disponíveis" alt="Saída do neofetch mostrando informações da CPU" src="../../images/cpuinfo.png" width="100%" height="100%">
+<img title="Verificando núcleos de CPU disponíveis" alt="Saída do neofetch mostrando informações da CPU" src="../images/cpuinfo.png" width="100%" height="100%">
 </p>
 
 Neste exemplo, um Intel i9-14900F com 32 núcleos:
 
 <p align="center">
-<img title="Detalhe da CPU utilizada no exemplo" alt="Detalhe do processador Intel i9-14900F com 32 núcleos" src="../../images/passo21.png" width="100%" height="100%">
+<img title="Detalhe da CPU utilizada no exemplo" alt="Detalhe do processador Intel i9-14900F com 32 núcleos" src="../images/passo21.png" width="100%" height="100%">
 </p>
 
 Defina os campos de paralelismo (**BB Number of Threads**, **PARALLEL_MAKE**, etc.) de acordo com a quantidade de núcleos disponível, para acelerar o build:
 
 <p align="center">
-<img title="Configurando o número de threads paralelas" alt="Campos de configuração de threads preenchidos com o número de núcleos" src="../../images/passo22.png" width="100%" height="100%">
+<img title="Configurando o número de threads paralelas" alt="Campos de configuração de threads preenchidos com o número de núcleos" src="../images/passo22.png" width="100%" height="100%">
 </p>
 
 ### 5.2 Argumentos de boot do kernel (UIO genérico)
@@ -300,15 +300,15 @@ Acesse:
 Adicione um driver de kernel **Generic UIO (Userspace I/O)** à imagem, para permitir acesso aos periféricos da PL a partir do userspace:
 
 <p align="center">
-<img title="Menu de argumentos extras de boot" alt="Menu de configuração de Kernel Bootargs" src="../../images/passo23.png" width="100%" height="100%">
+<img title="Menu de argumentos extras de boot" alt="Menu de configuração de Kernel Bootargs" src="../images/passo23.png" width="100%" height="100%">
 </p>
 
 <p align="center">
-<img title="Campo de argumentos extras de boot" alt="Campo de texto para adicionar argumentos extras de boot" src="../../images/passo24.png" width="100%" height="100%">
+<img title="Campo de argumentos extras de boot" alt="Campo de texto para adicionar argumentos extras de boot" src="../images/passo24.png" width="100%" height="100%">
 </p>
 
 <p align="center">
-<img title="Edição dos argumentos de boot" alt="Edição do campo de boot args" src="../../images/passo25.png" width="100%" height="100%">
+<img title="Edição dos argumentos de boot" alt="Edição do campo de boot args" src="../images/passo25.png" width="100%" height="100%">
 </p>
 
 Adicione o argumento:
@@ -318,7 +318,7 @@ uio_pdrv_genirq.of_id=generic-uio
 ```
 
 <p align="center">
-<img title="Argumento uio_pdrv_genirq adicionado" alt="Campo de boot args com uio_pdrv_genirq.of_id=generic-uio preenchido" src="../../images/passo26.png" width="100%" height="100%">
+<img title="Argumento uio_pdrv_genirq adicionado" alt="Campo de boot args com uio_pdrv_genirq.of_id=generic-uio preenchido" src="../images/passo26.png" width="100%" height="100%">
 </p>
 
 ### 5.3 Manter a PL no device tree
@@ -326,11 +326,11 @@ uio_pdrv_genirq.of_id=generic-uio
 Acesse **PetaLinux System Configuration → DT Settings** e **desmarque** a opção **Remove PL from devicetree**, para que os IPs da lógica programável apareçam no device tree final:
 
 <p align="center">
-<img title="Opção Remove PL from devicetree" alt="Menu DT Settings com a opção Remove PL from devicetree" src="../../images/passo27.png" width="100%" height="100%">
+<img title="Opção Remove PL from devicetree" alt="Menu DT Settings com a opção Remove PL from devicetree" src="../images/passo27.png" width="100%" height="100%">
 </p>
 
 <p align="center">
-<img title="Opção Remove PL from devicetree desmarcada" alt="Opção Remove PL from devicetree desmarcada" src="../../images/passo28.png" width="100%" height="100%">
+<img title="Opção Remove PL from devicetree desmarcada" alt="Opção Remove PL from devicetree desmarcada" src="../images/passo28.png" width="100%" height="100%">
 </p>
 
 ### 5.4 Empacotamento de imagem
@@ -338,17 +338,17 @@ Acesse **PetaLinux System Configuration → DT Settings** e **desmarque** a opç
 Acesse **PetaLinux System Configuration → Image Packaging Configuration** e **desmarque** a opção **Copy final images to tftpboot** (a menos que você use boot via TFTP):
 
 <p align="center">
-<img title="Opção Copy final images to tftpboot" alt="Menu Image Packaging Configuration com a opção tftpboot desmarcada" src="../../images/passo30.png" width="100%" height="100%">
+<img title="Opção Copy final images to tftpboot" alt="Menu Image Packaging Configuration com a opção tftpboot desmarcada" src="../images/passo30.png" width="100%" height="100%">
 </p>
 
 Salve as configurações e saia do menu **PetaLinux System Configuration**:
 
 <p align="center">
-<img title="Salvando as configurações do menu" alt="Tela de confirmação para salvar as configurações" src="../../images/passo31.png" width="100%" height="100%">
+<img title="Salvando as configurações do menu" alt="Tela de confirmação para salvar as configurações" src="../images/passo31.png" width="100%" height="100%">
 </p>
 
 <p align="center">
-<img title="Saindo do menu de configuração" alt="Terminal após sair do menu de configuração do PetaLinux" src="../../images/passo32.png" width="100%" height="100%">
+<img title="Saindo do menu de configuração" alt="Terminal após sair do menu de configuração do PetaLinux" src="../images/passo32.png" width="100%" height="100%">
 </p>
 
 ### 5.5 Sincronizar o device tree da PL
@@ -364,7 +364,7 @@ code project-spec/meta-user/recipes-bsp/device-tree/files/system-user.dtsi
 > **Nota:** Detalhes em GPIO PetaLinux [GPIO PetaLinux Part 2](https://www.linkedin.com/pulse/gpio-petalinux-part-2-roy-messinger/).
 
 <p align="center">
-<img title="Copiando pl.dtsi para system-user.dtsi" alt="VS Code com os arquivos pl.dtsi e system-user.dtsi lado a lado" src="../../images/passo33.png" width="100%" height="100%">
+<img title="Copiando pl.dtsi para system-user.dtsi" alt="VS Code com os arquivos pl.dtsi e system-user.dtsi lado a lado" src="../images/passo33.png" width="100%" height="100%">
 </p>
 
 Na linha correspondente ao nó `uio`, altere a propriedade `compatible` para:
@@ -376,15 +376,15 @@ compatible = "generic-uio";
 Salve e feche o VS Code:
 
 <p align="center">
-<img title="Alterando a propriedade compatible" alt="Linha compatible = generic-uio editada no system-user.dtsi" src="../../images/passo34.png" width="100%" height="100%">
+<img title="Alterando a propriedade compatible" alt="Linha compatible = generic-uio editada no system-user.dtsi" src="../images/passo34.png" width="100%" height="100%">
 </p>
 
 <p align="center">
-<img title="Arquivo system-user.dtsi salvo" alt="Arquivo salvo no VS Code" src="../../images/passo36.png" width="100%" height="100%">
+<img title="Arquivo system-user.dtsi salvo" alt="Arquivo salvo no VS Code" src="../images/passo36.png" width="100%" height="100%">
 </p>
 
 <p align="center">
-<img title="Terminal após edição do device tree" alt="Terminal de volta após fechar o editor" src="../../images/passo38.png" width="100%" height="100%">
+<img title="Terminal após edição do device tree" alt="Terminal de volta após fechar o editor" src="../images/passo38.png" width="100%" height="100%">
 </p>
 
 ## 6. Configurar o RootFS
@@ -418,17 +418,17 @@ petalinux-config -c rootfs
 **Observação:** em `gpio-demo`, mantenha as seguintes opções habilitadas:
 
 <p align="center">
-<img title="Opções do pacote gpio-demo" alt="Menu de configuração do pacote gpio-demo" src="../../images/passo39.png" width="100%" height="100%">
+<img title="Opções do pacote gpio-demo" alt="Menu de configuração do pacote gpio-demo" src="../images/passo39.png" width="100%" height="100%">
 </p>
 
 <p align="center">
-<img title="Sub-opções habilitadas em gpio-demo" alt="Sub-opções do gpio-demo marcadas" src="../../images/passo40.png" width="100%" height="100%">
+<img title="Sub-opções habilitadas em gpio-demo" alt="Sub-opções do gpio-demo marcadas" src="../images/passo40.png" width="100%" height="100%">
 </p>
 
 Salve as configurações e saia do menu **Configuration**:
 
 <p align="center">
-<img title="Confirmação das opções do gpio-demo" alt="Tela final de confirmação das opções do gpio-demo" src="../../images/passo41.png" width="100%" height="100%">
+<img title="Confirmação das opções do gpio-demo" alt="Tela final de confirmação das opções do gpio-demo" src="../images/passo41.png" width="100%" height="100%">
 </p>
 
 ## 7. Compilar o PetaLinux
@@ -440,13 +440,13 @@ petalinux-build
 ```
 
 <p align="center">
-<img title="Início do build do PetaLinux" alt="Terminal com o build do PetaLinux em andamento" src="../../images/passo43.png" width="100%" height="100%">
+<img title="Início do build do PetaLinux" alt="Terminal com o build do PetaLinux em andamento" src="../images/passo43.png" width="100%" height="100%">
 </p>
 
 É comum que a **primeira execução** apresente avisos e erros relacionados a cache do Yocto/BitBake, fazendo o build falhar. Nesse caso, basta executar o comando novamente — o cache já parcialmente construído normalmente resolve o problema na segunda tentativa. Para mais detalhes sobre falhas conhecidas de build, consulte o guia de troubleshooting do PetaLinux/Yocto, por exemplo a seção ["Build failures" da documentação do RPi Camera FMC](https://rpi.camerafmc.com/en/latest/troubleshooting.html) ou a documentação oficial da AMD/Xilinx para a sua versão de ferramentas.
 
 <p align="center">
-<img title="Erros de cache na primeira execução do build" alt="Terminal mostrando erros de cache na primeira tentativa de build" src="../../images/passo44.png" width="100%" height="100%">
+<img title="Erros de cache na primeira execução do build" alt="Terminal mostrando erros de cache na primeira tentativa de build" src="../images/passo44.png" width="100%" height="100%">
 </p>
 
 Execute novamente:
@@ -456,7 +456,7 @@ petalinux-build
 ```
 
 <p align="center">
-<img title="Segunda execução do build" alt="Terminal com a segunda execução do petalinux-build" src="../../images/passo45.png" width="100%" height="100%">
+<img title="Segunda execução do build" alt="Terminal com a segunda execução do petalinux-build" src="../images/passo45.png" width="100%" height="100%">
 </p>
 
 ### Compilação bem-sucedida
@@ -464,7 +464,7 @@ petalinux-build
 Ao final, os artefatos de boot (`BOOT.BIN`, `boot.scr`, `image.ub`/`Image`, `system.dtb`, rootfs) estarão disponíveis em `images/linux/` dentro do projeto, prontos para serem gravados em um cartão SD/pen drive ou usados via TFTP/JTAG.
 
 <p align="center">
-<img title="Build do PetaLinux concluído com sucesso" alt="Terminal mostrando o build do PetaLinux finalizado com sucesso" src="../../images/passo46.png" width="100%" height="100%">
+<img title="Build do PetaLinux concluído com sucesso" alt="Terminal mostrando o build do PetaLinux finalizado com sucesso" src="../images/passo46.png" width="100%" height="100%">
 </p>
 
 ## 8. Boot via JTAG / Pen Drive
@@ -476,7 +476,7 @@ A escolha desse método se deu em virtude da restrição imposta de realizar tod
 Copie os artefatos gerados pelo build (neste exemplo, de `/home/xmen/workspace/images/linux`) para o pen drive (neste exemplo, `/run/media/xmen/valmir`):
 
 <p align="center">
-<img title="Build do PetaLinux concluído com sucesso" alt="Terminal mostrando o build do PetaLinux finalizado com sucesso, artefatos prontos para copiar" src="../../images/passo48.png" width="100%" height="100%">
+<img title="Build do PetaLinux concluído com sucesso" alt="Terminal mostrando o build do PetaLinux finalizado com sucesso, artefatos prontos para copiar" src="../images/passo48.png" width="100%" height="100%">
 </p>
 
 Crie uma pasta no seu pen drive com o nome que desejar.
@@ -502,7 +502,7 @@ cp rootfs.cpio.gz.u-boot image.ub /run/media/xmen/valmir/workspace
 ```
 
 <p align="center">
-<img title="Artefatos copiados para o pen drive" alt="Terminal mostrando a cópia de rootfs.cpio.gz.u-boot e image.ub para o pen drive" src="../../images/passo49.png" width="100%" height="100%">
+<img title="Artefatos copiados para o pen drive" alt="Terminal mostrando a cópia de rootfs.cpio.gz.u-boot e image.ub para o pen drive" src="../images/passo49.png" width="100%" height="100%">
 </p>
 
 ### Passo 2 — Conectar o pen drive e abrir o monitor serial
@@ -512,23 +512,23 @@ Após copiar os arquivos, conecte o pen drive na FPGA.
 Inicie o Vitis e vá em **Vitis → Serial Monitor**. Selecione a primeira UART referente ao ZYNQ:
 
 <p align="center">
-<img title="Seleção da UART no Vitis" alt="Menu Serial Monitor do Vitis com a UART do ZYNQ sendo selecionada" src="../../images/passo50.png" width="100%" height="100%">
+<img title="Seleção da UART no Vitis" alt="Menu Serial Monitor do Vitis com a UART do ZYNQ sendo selecionada" src="../images/passo50.png" width="100%" height="100%">
 </p>
 
 <p align="center">
-<img title="Monitor serial conectado" alt="Terminal serial conectado à UART da placa" src="../../images/passo51.png" width="100%" height="100%">
+<img title="Monitor serial conectado" alt="Terminal serial conectado à UART da placa" src="../images/passo51.png" width="100%" height="100%">
 </p>
 
 Carregue o ambiente PetaLinux novamente:
 
 <p align="center">
-<img title="Carregando o ambiente PetaLinux novamente" alt="Terminal executando o source do settings.sh do PetaLinux" src="../../images/passo52.png" width="100%" height="100%">
+<img title="Carregando o ambiente PetaLinux novamente" alt="Terminal executando o source do settings.sh do PetaLinux" src="../images/passo52.png" width="100%" height="100%">
 </p>
 
 E vá até o diretório do projeto (`/home/xmen/workspace/xilinx-zcu106-2025.2`):
 
 <p align="center">
-<img title="Acessando o diretório do projeto" alt="Terminal no diretório do projeto PetaLinux" src="../../images/passo53.png" width="100%" height="100%">
+<img title="Acessando o diretório do projeto" alt="Terminal no diretório do projeto PetaLinux" src="../images/passo53.png" width="100%" height="100%">
 </p>
 
 ### Passo 3 — Iniciar o U-Boot via JTAG
@@ -540,7 +540,7 @@ petalinux-boot jtag --prebuilt 2
 ```
 
 <p align="center">
-<img title="Boot via JTAG com imagem pré-compilada" alt="Terminal executando petalinux-boot jtag --prebuilt 2" src="../../images/passo54.png" width="100%" height="100%">
+<img title="Boot via JTAG com imagem pré-compilada" alt="Terminal executando petalinux-boot jtag --prebuilt 2" src="../images/passo54.png" width="100%" height="100%">
 </p>
 
 ### Passo 4 — Carregar os arquivos para a memória RAM
@@ -562,7 +562,7 @@ fatload usb 0:1 0x20000000 workspace/rootfs.cpio.gz.u-boot
 ```
 
 <p align="center">
-<img title="Carregando os artefatos na memória RAM" alt="Terminal com os comandos fatload carregando image.ub e rootfs na RAM" src="../../images/passo55.png" width="100%" height="100%">
+<img title="Carregando os artefatos na memória RAM" alt="Terminal com os comandos fatload carregando image.ub e rootfs na RAM" src="../images/passo55.png" width="100%" height="100%">
 </p>
 
 ### Passo 5 — Boot pela memória RAM
@@ -572,13 +572,13 @@ bootm 0x10000000 0x20000000
 ```
 
 <p align="center">
-<img title="Executando o boot pela memória RAM" alt="Terminal executando o comando bootm" src="../../images/passo56.png" width="100%" height="100%">
+<img title="Executando o boot pela memória RAM" alt="Terminal executando o comando bootm" src="../images/passo56.png" width="100%" height="100%">
 </p>
 
 > **Obs.:** por esse método, é esperado que o boot fique travado nesta tela — isso acontece porque ainda falta gravar o bitstream na lógica programável.
 
 <p align="center">
-<img title="Boot travado por falta do bitstream" alt="Terminal com o boot parado aguardando a programação da lógica programável" src="../../images/passo57.png" width="100%" height="100%">
+<img title="Boot travado por falta do bitstream" alt="Terminal com o boot parado aguardando a programação da lógica programável" src="../images/passo57.png" width="100%" height="100%">
 </p>
 
 ### Passo 6 — Gravar o bitstream na lógica programável
@@ -586,19 +586,19 @@ bootm 0x10000000 0x20000000
 No Vivado, vá em **PROGRAM AND DEBUG → Program Device**, selecione a placa (neste exemplo, `xczu7_0`):
 
 <p align="center">
-<img title="Seleção do dispositivo no Vivado" alt="Menu Program Device do Vivado com o dispositivo xczu7_0 selecionado" src="../../images/passo58.png" width="100%" height="100%">
+<img title="Seleção do dispositivo no Vivado" alt="Menu Program Device do Vivado com o dispositivo xczu7_0 selecionado" src="../images/passo58.png" width="100%" height="100%">
 </p>
 
 **PROGRAM AND DEBUG → Program Device → `xczu7_0` → Program**
 
 <p align="center">
-<img title="Programação do bitstream" alt="Vivado gravando o bitstream no dispositivo xczu7_0" src="../../images/passo59.png" width="100%" height="100%">
+<img title="Programação do bitstream" alt="Vivado gravando o bitstream no dispositivo xczu7_0" src="../images/passo59.png" width="100%" height="100%">
 </p>
 
 Após isso, o sistema inicializará:
 
 <p align="center">
-<img title="Sistema inicializado com sucesso" alt="Terminal mostrando o Linux embarcado inicializado com sucesso" src="../../images/passo60.png" width="100%" height="100%">
+<img title="Sistema inicializado com sucesso" alt="Terminal mostrando o Linux embarcado inicializado com sucesso" src="../images/passo60.png" width="100%" height="100%">
 </p>
 
 ### Passo 7 — Login inicial e acesso via SSH
@@ -606,7 +606,7 @@ Após isso, o sistema inicializará:
 Por padrão, o usuário é `petalinux`; a senha é a que você definiu durante o primeiro acesso.
 
 <p align="center">
-<img title="Prompt de login do PetaLinux" alt="Terminal mostrando o prompt de login do usuário petalinux" src="../../images/passo61.png" width="100%" height="100%">
+<img title="Prompt de login do PetaLinux" alt="Terminal mostrando o prompt de login do usuário petalinux" src="../images/passo61.png" width="100%" height="100%">
 </p>
 
 A essa altura, você já deve ter percebido que, ao usar a UART, os comandos aparecem duplicados. Por isso, recomenda-se a utilização do SSH. Para isso, é preciso conectar a FPGA à rede e descobrir o endereço IP associado:
@@ -618,7 +618,7 @@ ifconfig
 Neste exemplo, o IP obtido foi `192.168.130.31`:
 
 <p align="center">
-<img title="Verificando o endereço IP da placa" alt="Terminal mostrando a saída do comando ifconfig com o IP da placa" src="../../images/passo62.png" width="100%" height="100%">
+<img title="Verificando o endereço IP da placa" alt="Terminal mostrando a saída do comando ifconfig com o IP da placa" src="../images/passo62.png" width="100%" height="100%">
 </p>
 
 Abra um terminal no host e conecte via SSH:
@@ -628,13 +628,13 @@ ssh petalinux@192.168.130.31
 ```
 
 <p align="center">
-<img title="Conectando via SSH" alt="Terminal do host conectando à placa via ssh" src="../../images/passo63.png" width="100%" height="100%">
+<img title="Conectando via SSH" alt="Terminal do host conectando à placa via ssh" src="../images/passo63.png" width="100%" height="100%">
 </p>
 
 > **Obs.:** use a senha definida anteriormente.
 
 <p align="center">
-<img title="Autenticação via SSH" alt="Terminal solicitando a senha do usuário petalinux via SSH" src="../../images/passo64.png" width="100%" height="100%">
+<img title="Autenticação via SSH" alt="Terminal solicitando a senha do usuário petalinux via SSH" src="../images/passo64.png" width="100%" height="100%">
 </p>
 
 ### Passo 8 — Verificar o reconhecimento do UIO
@@ -646,7 +646,7 @@ cat /sys/class/uio/uio*/name
 ```
 
 <p align="center">
-<img title="Verificação do UIO" alt="Terminal mostrando a saída do cat em /sys/class/uio/uio*/name" src="../../images/passo66.png" width="100%" height="100%">
+<img title="Verificação do UIO" alt="Terminal mostrando a saída do cat em /sys/class/uio/uio*/name" src="../images/passo66.png" width="100%" height="100%">
 </p>
 
 ## 9. Deploy na FPGA
@@ -670,23 +670,23 @@ Com o sistema no ar e acessível via SSH, o deploy da aplicação segue os passo
 O projeto usado como exemplo está na pasta `examples` e explora a utilização de múltiplos reatores a partir de uma extensão do subconjunto da linguagem Lingua Franca voltada para o *Codesign of Reactor-Oriented Hardware and Software for Cyber-Physical Systems*.
 
 <p align="center">
-<img title="Deploy do projeto na FPGA" alt="Terminal mostrando o deploy do projeto ExplorationMultipleReactorsCodesign na FPGA" src="../../images/passo71.png" width="100%" height="100%">
+<img title="Deploy do projeto na FPGA" alt="Terminal mostrando o deploy do projeto ExplorationMultipleReactorsCodesign na FPGA" src="../images/passo71.png" width="100%" height="100%">
 </p>
 
 <p align="center">
-<img title="Execução do binário na FPGA" alt="Terminal mostrando a execução do binário ExplorationMultipleReactorsCodesign" src="../../images/passo67.png" width="100%" height="100%">
+<img title="Execução do binário na FPGA" alt="Terminal mostrando a execução do binário ExplorationMultipleReactorsCodesign" src="../images/passo67.png" width="100%" height="100%">
 </p>
 
 Caso ocorra um erro de **Bus error (core dumped)**, será necessário programar novamente o bitstream — use os passos descritos na [seção 8](#8-boot-via-jtag--pen-drive).
 
 <p align="center">
-<img title="Erro Bus error (core dumped)" alt="Terminal mostrando o erro Bus error (core dumped) na execução do binário" src="../../images/passo68.png" width="100%" height="100%">
+<img title="Erro Bus error (core dumped)" alt="Terminal mostrando o erro Bus error (core dumped) na execução do binário" src="../images/passo68.png" width="100%" height="100%">
 </p>
 
 Execute novamente:
 
 <p align="center">
-<img title="Execução bem-sucedida após reprogramar o bitstream" alt="Terminal mostrando a execução bem-sucedida do binário após reprogramar o bitstream" src="../../images/passo70.png" width="100%" height="100%">
+<img title="Execução bem-sucedida após reprogramar o bitstream" alt="Terminal mostrando a execução bem-sucedida do binário após reprogramar o bitstream" src="../images/passo70.png" width="100%" height="100%">
 </p>
 
 ---
