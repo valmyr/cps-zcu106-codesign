@@ -994,6 +994,7 @@ deploy: compiler
 		printf "$(VERDE)Encapsulando implementacao Software e Hardware...$(RESET)\n"; \
 		printf "$(VERDE)Copiando arquivos Verilog...$(RESET)\n"; \
 		cp ./codesign-gen/$(basename $(PROJETO))/src-gen/hardware/_FpgaTop/build/ZCU106Wrapper.v ./deploy_all_files ; \
+    cp ./codesign-gen/$(basename $(PROJETO))/src-gen/reactor-chisel/fpga-tidbits/src/main/resources/verilog/Q_srl.v ./deploy_all_files ; \
 		printf "$(VERDE)Copiando arquivos da biblioteca...$(RESET)\n"; \
 		cp -r ./codesign-gen/$(basename $(PROJETO))/lib ./deploy_all_files ; \
 		cp -r ./bin/$(basename $(PROJETO)) ./deploy_all_files/bin/ ; \
@@ -1001,6 +1002,7 @@ deploy: compiler
 		printf "$(VERDE)Compactando...$(RESET)\n"; \
 		tar -czf ./$(basename $(PROJETO))_$(TIMESTAMP)_deploy.tar.gz \
 			./deploy_all_files/ZCU106Wrapper.v \
+      ./deploy_all_files/Q_srl.v \
 			./deploy_all_files/lib \
 			./deploy_all_files/bin/$(basename $(PROJETO)) \
 			./deploy_all_files/$(basename $(PROJETO))_SNAPSHOT_$(TIMESTAMP).lf; \

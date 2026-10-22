@@ -1,12 +1,12 @@
 # Makefile para compilar 
-#Caso I deploy em FPGA: make all PROJETO=loopback.lf ARCH=arm
-#Caso II simulacao	  : make all PROJETO=loopback.lf ARCH=x86_64
+#Caso I deploy em FPGA: make all PROJETO=ExplorationMultipleReactorsCodesignAccelsOpBasics.lf ARCH=arm
+#Caso II simulacao	  : make all PROJETO=ExplorationMultipleReactorsCodesignAccelsOpBasics.lf ARCH=x86_64
 #É necessário especificar a extensão do arquivo; isso é uma escolha arbitrária exclusivamente minha.
 VERMELHO = \033[1;31m
 VERDE    = \033[1;32m
 AMARELO  = \033[1;33m
 RESET    = \033[0m
-PROJETO  ?= loopback.lf
+PROJETO  ?= ExplorationMultipleReactorsCodesignAccelsOpBasics.lf
 ARCH ?= arm
 TIMESTAMP := $(shell date +%Y%m%d_%H%M)
 ifeq ($(ARCH),arm)
@@ -50,6 +50,7 @@ deploy: compiler
 		printf "$(VERDE)Encapsulando implementacao Software e Hardware...$(RESET)\n"; \
 		printf "$(VERDE)Copiando arquivos Verilog...$(RESET)\n"; \
 		cp ./codesign-gen/$(basename $(PROJETO))/src-gen/hardware/_FpgaTop/build/ZCU106Wrapper.v ./deploy_all_files ; \
+    cp ./codesign-gen/$(basename $(PROJETO))/src-gen/reactor-chisel/fpga-tidbits/src/main/resources/verilog/Q_srl.v ./deploy_all_files ; \
 		printf "$(VERDE)Copiando arquivos da biblioteca...$(RESET)\n"; \
 		cp -r ./codesign-gen/$(basename $(PROJETO))/lib ./deploy_all_files ; \
 		cp -r ./bin/$(basename $(PROJETO)) ./deploy_all_files/bin/ ; \
@@ -57,6 +58,7 @@ deploy: compiler
 		printf "$(VERDE)Compactando...$(RESET)\n"; \
 		tar -czf ./$(basename $(PROJETO))_$(TIMESTAMP)_deploy.tar.gz \
 			./deploy_all_files/ZCU106Wrapper.v \
+      ./deploy_all_files/Q_srl.v \
 			./deploy_all_files/lib \
 			./deploy_all_files/bin/$(basename $(PROJETO)) \
 			./deploy_all_files/$(basename $(PROJETO))_SNAPSHOT_$(TIMESTAMP).lf; \

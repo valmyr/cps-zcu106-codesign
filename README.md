@@ -107,6 +107,7 @@ Os arquivos em `patches/` são **exatamente** o conteúdo que o `docker/lingua-f
 │                                      ▼                                 │
 │                    smoke_test<timestamp>_deploy.tar.gz                 │
 │                      ├── ZCU106Wrapper.v                               │
+│                      ├── Q_srl.v                                       │
 │                      ├── lib/libreactor-cpp-default.so*                │
 │                      ├── bin/smoke_test                                │
 │                      └── smoke_testSNAPSHOT_<timestamp>.lf             │

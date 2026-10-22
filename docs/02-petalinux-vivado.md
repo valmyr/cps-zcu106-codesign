@@ -61,15 +61,17 @@ Este tutorial mostra o fluxo completo para gerar uma imagem Linux embarcado (Pet
 
 ---
 
-## 1. Preparando o Hardware no Vivado
+## 1. Preparando o hardware no Vivado
+
+Esta seção cobre o que acontece entre o `.tar.gz` gerado pelo container e a
+exportação do XSA: criar o projeto, trazer o `ZCU106Wrapper.v` para o Block
+Design, atribuir o endereço do acelerador e gerar o bitstream.
+
+> **Entrada:** `ZCU106Wrapper.v` e `Q_srl.v`, extraídos de `deploy_all_files/`
+> no `.tar.gz` produzido por `make deploy ... ARCH=arm`.
+> **Saídas:** o bitstream (gravado na PL) e o `.xsa` (consumido pelo PetaLinux).
 
 ### 1.1 Carregar o ambiente Vitis
-
-Antes de exportar o hardware, confira no gerenciador de fontes do Vivado se o *block design* e os demais arquivos do projeto estão corretos e sem erros pendentes.
-
-<p align="center">
-<img title="Carregando o ambiente Vitis via source" alt="Terminal executando o source do settings.sh do Vitis" src="../images/passo1.png" width="100%" height="100%">
-</p>
 
 ```bash
 source <diretório de instalação do Vitis>/settings.sh
@@ -81,13 +83,287 @@ Exemplo:
 source ~/Music/2025.2/Vitis/settings.sh
 ```
 
-### 1.2 Validar o Block Design
+<p align="center">
+<img title="Carregando o ambiente Vitis via source" alt="Terminal executando o source do settings.sh do Vitis" src="../images/passo1.png" width="100%" height="100%">
+</p>
 
-Abra o *Block Design* e valide a arquitetura do sistema (processador, barramentos, IPs periféricos, clocks e resets). É neste momento que se confirma se todos os blocos necessários para o PetaLinux (UART, memória DDR, controlador de armazenamento, etc.) estão presentes e conectados corretamente.
+### 1.2 Criar o projeto
+
+**File → Project → New**, e avance no assistente.
 
 <p align="center">
-<img title="Block Design no Vivado" alt="Block design do Vivado com processador e periféricos conectados" src="../images/passo2.png" width="100%" height="100%">
+<img title="Assistente de novo projeto" alt="Tela inicial do assistente New Project do Vivado" src="../images/passo-01.png" width="100%" height="100%">
 </p>
+
+<p align="center">
+<img title="Assistente de novo projeto" alt="Segunda tela do assistente New Project" src="../images/passo-02.png" width="100%" height="100%">
+</p>
+
+Dê nome e escolha o diretório do projeto (neste tutorial, `project_14` em
+`/home/xmen`):
+
+<p align="center">
+<img title="Nome e local do projeto" alt="Campos de nome e diretório do projeto preenchidos" src="../images/passo-03.png" width="100%" height="100%">
+</p>
+
+Selecione **RTL Project** e deixe *Do not specify sources at this time*
+desmarcado — os arquivos `.v` serão adicionados no próximo passo:
+
+<p align="center">
+<img title="Tipo de projeto RTL" alt="Seleção de RTL Project no assistente" src="../images/passo-04.png" width="100%" height="100%">
+</p>
+
+### 1.3 Trazer o RTL gerado pelo compilador
+
+Copie o `<projeto>_<timestamp>_deploy.tar.gz` do container para o host onde o
+Vivado está instalado e extraia:
+
+<p align="center">
+<img title="Copiando e extraindo o pacote de deploy" alt="Gerenciador de arquivos com o .tar.gz extraído em deploy_all_files" src="../images/passo-05.png" width="100%" height="100%">
+</p>
+
+Na etapa **Add Sources** do assistente, escolha *Add or create design sources*:
+
+<p align="center">
+<img title="Adicionar arquivos de design" alt="Tela Add Sources do assistente de novo projeto" src="../images/passo-07.png" width="100%" height="100%">
+</p>
+
+Navegue até a pasta extraída e selecione **os dois** arquivos: `ZCU106Wrapper.v`
+e `Q_srl.v`.
+
+> **O `Q_srl.v` não é opcional.** Ele é o único arquivo Verilog do
+> `fpga-tidbits` que não é gerado pelo Chisel, e é instanciado por
+> `SRLQueue`/`FPGAQueue` dentro do wrapper. Sem ele, o `ZCU106Wrapper` fica
+> incompleto e **aparece acinzentado** (incompatível) na hora de adicioná-lo ao
+> Block Design — ver 1.6.
+
+<p align="center">
+<img title="Seleção dos arquivos Verilog" alt="Navegador de arquivos com ZCU106Wrapper.v e Q_srl.v selecionados" src="../images/passo-08.png" width="100%" height="100%">
+</p>
+
+Na seleção de part, vá à aba **Boards** e procure por `zcu106`:
+
+<p align="center">
+<img title="Seleção da part" alt="Tela de seleção de part do assistente" src="../images/passo-09.png" width="100%" height="100%">
+</p>
+
+<p align="center">
+<img title="Placa ZCU106 selecionada" alt="Aba Boards com a Zynq UltraScale+ ZCU106 Evaluation Platform selecionada" src="../images/passo-10.png" width="100%" height="100%">
+</p>
+
+Isso define a part `xczu7ev-ffvc1156-2-e` — o mesmo part number registrado no
+`fpgaPartMap` do compilador para a `ZCU106`. Confirme o resumo e finalize:
+
+<p align="center">
+<img title="Resumo do novo projeto" alt="Tela final do assistente com o resumo do projeto" src="../images/passo-11.png" width="100%" height="100%">
+</p>
+
+Com o projeto criado, a aba Sources mostra a hierarquia completa do acelerador —
+`CodesignTopReactor`, `Hardware_ZCU106` e os reactors que você escreveu no `.lf`
+(`Accel_Sum`, `Accel_Mult`, `Accel_Subtrac`), além do `RegFile` e dos adaptadores
+AXI:
+
+<p align="center">
+<img title="Hierarquia do projeto" alt="Project Summary com a hierarquia do ZCU106Wrapper expandida" src="../images/passo-12.png" width="100%" height="100%">
+</p>
+
+É um bom momento para conferir que os reactors do seu `.lf` realmente viraram
+hardware — cada um aparece como um módulo próprio.
+
+### 1.4 Criar o Block Design
+
+**IP INTEGRATOR → Create Block Design**:
+
+<p align="center">
+<img title="Hierarquia e Create Block Design" alt="Reactors destacados na hierarquia e seta apontando para Create Block Design" src="../images/passo-13.png" width="100%" height="100%">
+</p>
+
+Aceite o nome padrão (`design_1`):
+
+<p align="center">
+<img title="Nome do Block Design" alt="Diálogo Create Block Design com o nome design_1" src="../images/passo-14.png" width="100%" height="100%">
+</p>
+
+### 1.5 Adicionar o processador
+
+No diagrama vazio, clique em **+** (Add IP), digite `zynq` e escolha
+**Zynq UltraScale+ MPSoC**:
+
+<p align="center">
+<img title="Adicionando o Zynq UltraScale+ MPSoC" alt="Busca por zynq no catálogo de IP" src="../images/passo-15.png" width="100%" height="100%">
+</p>
+
+Rode o **Run Block Automation** oferecido na barra verde: ele aplica as
+predefinições da ZCU106 (DDR, UART, Ethernet, clocks).
+
+### 1.6 Adicionar o `ZCU106Wrapper`
+
+O wrapper é RTL do projeto, não um IP do catálogo. Clique com o botão direito em
+uma área vazia do diagrama e escolha **Add Module…**:
+
+<p align="center">
+<img title="Menu Add Module" alt="Menu de contexto do diagrama com Add Module destacado" src="../images/passo-16.png" width="100%" height="100%">
+</p>
+
+Selecione `ZCU106Wrapper` na lista:
+
+<p align="center">
+<img title="Seleção do módulo ZCU106Wrapper" alt="Diálogo Add Module com ZCU106Wrapper selecionado" src="../images/passo-17.png" width="100%" height="100%">
+</p>
+
+> **Se o `ZCU106Wrapper` aparecer acinzentado:** falta o `Q_srl.v` no projeto
+> (1.3). Os submódulos aparecem normalmente e só o topo fica desabilitado,
+> porque o Vivado o trata como hierarquia incompleta. Adicione o arquivo por
+> **Add Sources** e reabra o diálogo. Desmarcar *Hide incompatible modules* só
+> revela o problema — não o resolve.
+
+O bloco entra no diagrama já com as interfaces AXI agrupadas: `csr` (AXI4-Lite,
+slave) e `mem0..mem3` (AXI4, master), mais `clock` e `reset`.
+
+### 1.7 Periféricos opcionais
+
+LEDs e dip switches não são exigidos pelo fluxo — use se quiser um sinal visual
+de que o sistema está vivo. **Add IP → `AXI GPIO`**:
+
+<p align="center">
+<img title="Adicionando o AXI GPIO" alt="Busca por AXI GPIO no catálogo de IP" src="../images/passo-18.png" width="100%" height="100%">
+</p>
+
+Neste ponto o diagrama tem os três blocos, ainda sem conexões:
+
+<p align="center">
+<img title="Blocos adicionados ao diagrama" alt="ZCU106Wrapper, AXI GPIO e Zynq UltraScale+ MPSoC no diagrama, desconectados" src="../images/passo-19.png" width="100%" height="100%">
+</p>
+
+### 1.8 Conexões automáticas
+
+Clique em **Run Connection Automation** na barra verde e marque tudo. A primeira
+passada conecta o `csr` do wrapper e as interfaces do GPIO ao
+`M_AXI_HPM0_FPD` do PS, criando o `AXI SmartConnect` e o `Processor System Reset`:
+
+<p align="center">
+<img title="Connection Automation — csr e GPIO" alt="Diálogo Run Connection Automation com csr do ZCU106Wrapper e interfaces do AXI GPIO marcadas" src="../images/passo-20.png" width="100%" height="100%">
+</p>
+
+Rode novamente para as portas de memória: `mem0..mem3` do wrapper em direção ao
+PS:
+
+<p align="center">
+<img title="Connection Automation — portas de memória" alt="Diálogo Run Connection Automation com mem0 a mem3 marcadas" src="../images/passo-21.png" width="100%" height="100%">
+</p>
+
+> **Nota:** o acelerador usa efetivamente `mem0`; `mem1..mem3` são portas
+> plugadas com defaults pelo `AXIPlatformWrapper`. Conectá-las não faz mal, e
+> deixá-las desconectadas também funciona — reduz a fiação do diagrama.
+
+### 1.9 Clock e reset
+
+O `pl_clk0` do PS alimenta o wrapper, o `Processor System Reset` e os
+SmartConnects. Neste tutorial ele está em **100 MHz**.
+
+> **Esse número precisa ir para o `.lf`.** O RTL gerado incrementa os
+> registradores de tempo lógico (`physicalTag`, `regClock`) a cada pulso de
+> clock, somando o valor de `clock-period`. Com 100 MHz:
+>
+> ```lf
+> target Codesign {
+>   fpgaBoard: ZCU106,
+>   clock-period: 10 nsec   // 10 ns = 100 MHz, igual ao pl_clk0
+> }
+> ```
+>
+> O default é 1 nsec (1 GHz). Gerar o RTL com o default e sintetizar a 100 MHz
+> deixa toda a coordenação de tags 10× dessincronizada do tempo real.
+
+>**Verifique o reset.** A entrada `reset` do `ZCU106Wrapper` é
+> **ativa-em-alto**: ligue em `peripheral_reset` do `Processor System Reset`,
+> **não** em `peripheral_aresetn`. Invertido, o acelerador fica permanentemente
+> em reset — a síntese passa sem reclamar e a falha só aparece na leitura de
+> assinatura, em tempo de execução.
+
+### 1.10 Depuração com System ILA (opcional)
+
+Para observar as transações AXI no Hardware Manager, clique com o botão direito
+sobre a conexão do `csr` e escolha **Debug**:
+
+<p align="center">
+<img title="Marcando a conexão para debug" alt="Menu de contexto da conexão AXI com a opção Debug destacada" src="../images/passo-22.png" width="100%" height="100%">
+</p>
+
+O Connection Automation passa então a oferecer a inserção do **System ILA**. Os defaults
+(*Data and Trigger* em todos os canais, clock do `pl_clk0`) servem:
+
+<p align="center">
+<img title="Inserção do System ILA" alt="Diálogo Run Connection Automation configurando o System ILA" src="../images/passo-23.png" width="100%" height="100%">
+</p>
+
+### 1.11 Endereço do acelerador
+
+Abra a aba **Address Editor**. Se estiver vazia, clique em *Generate Address Map*:
+
+<p align="center">
+<img title="Address Map ainda não gerado" alt="Aba Address Map com o link Generate Address Map" src="../images/passo-24.png" width="100%" height="100%">
+</p>
+
+Por padrão o Vivado atribui ao `csr` um endereço alto com range de 4G — no
+exemplo, `0x5_0000_0000`:
+
+<p align="center">
+<img title="Endereço atribuído automaticamente" alt="Address Editor mostrando o csr em 0x5_0000_0000 com range 4G" src="../images/passo-25.png" width="100%" height="100%">
+</p>
+
+**Altere para `0xA000_0000` com range `64K`**, a faixa convencional de
+periféricos da PL no MPSoC:
+
+<p align="center">
+<img title="Endereço corrigido do csr" alt="Address Editor com o csr em 0xA000_0000 e range 64K" src="../images/passo-27.png" width="100%" height="100%">
+</p>
+
+> **Por que esse endereço importa.** Ele está definido diretamente no código (hardcoded).
+>
+> 1. O `sdtgen` o escreve no device tree como o nó `ZCU106Wrapper@a0000000`.
+> 2. O kernel expõe esse nome em `/sys/class/uio/uioN/name`.
+> 3. O `platform-mpsoc-uio.cpp` procura pela substring `"ZCU106Wrapper"` nesse
+>    arquivo para descobrir qual `/dev/uioN` abrir.
+>
+> Como a busca é por substring, mudar o endereço não quebra o driver — mas
+> renomear o wrapper, sim. E o range de 4G do default faz o acelerador ocupar
+> uma faixa absurda do mapa de endereços; 64K é o tamanho real do regfile.
+
+### 1.12 Gerar o wrapper HDL
+
+Valide o diagrama com **Validate Design** (`F6`). Depois, na aba Sources, clique
+com o botão direito em `design_1` e escolha **Create HDL Wrapper** (deixe o
+Vivado gerenciar):
+
+<p align="center">
+<img title="Create HDL Wrapper" alt="Menu de contexto do design_1 com Create HDL Wrapper e Generate Output Products" src="../images/passo-28.png" width="100%" height="100%">
+</p>
+
+Defina o `design_1_wrapper` como topo do projeto (**Set as Top**):
+
+<p align="center">
+<img title="Definindo o topo do projeto" alt="Menu de contexto do design_1_wrapper com Set as Top destacado" src="../images/passo-29.png" width="100%" height="100%">
+</p>
+
+O `design_1_wrapper` passa a aparecer em negrito na hierarquia:
+
+<p align="center">
+<img title="Projeto pronto para síntese" alt="Hierarquia com design_1_wrapper como topo e o diagrama completo" src="../images/passo-30.png" width="100%" height="100%">
+</p>
+
+### 1.13 Gerar o bitstream
+
+**PROGRAM AND DEBUG → Generate Bitstream**. Ajuste *Number of jobs* para o
+número de núcleos disponíveis:
+
+<p align="center">
+<img title="Launch Runs do Generate Bitstream" alt="Diálogo Launch Runs com o número de jobs configurado" src="../images/passo-31.png" width="100%" height="100%">
+</p>
+
+Síntese e implementação levam dezenas de minutos. Com `write_bitstream Complete`
+na barra de status, siga para a exportação do XSA.
+
 
 ## 2. Exportando o Hardware (XSA)
 
@@ -98,7 +374,7 @@ No Vivado, vá em **File → Export → Export Hardware** e siga o assistente:
 **Passo 1 – Início do assistente de exportação.** Confirme que deseja exportar o hardware do projeto atual.
 
 <p align="center">
-<img title="Assistente de exportação de hardware" alt="Tela inicial do assistente Export Hardware do Vivado" src="../images/passo3.png" width="100%" height="100%">
+<img title="Assistente de exportação de hardware" alt="Tela inicial do assistente Export Hardware do Vivado" src="../images/passo-32.png" width="100%" height="100%">
 </p>
 
 <p align="center">
