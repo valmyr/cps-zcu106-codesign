@@ -250,7 +250,7 @@
 
 13) **Tema do Oh My Zsh: `jonathan`.**
     Configurado via `sed` no `~/.zshrc` logo após a instalação do Oh My Zsh,
-    substituindo o tema padrão (`robbyrussell`). Puramente cosmético, não
+    substituindo o tema padrão (`robbyrussell`). Puramente enfeite, não
     afeta nenhum fluxo de build/geração - documentado aqui só para quem for
     customizar de novo depois saber onde procurar (`ZSH_THEME=` no
     `~/.zshrc`, um único `sed -i 's/^ZSH_THEME=.*/ZSH_THEME="jonathan"/'

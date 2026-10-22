@@ -208,7 +208,7 @@ make compiler PROJETO=loopback_sim.lf ARCH=x86_64
 
 Falha em qualquer um dos testes 1 a 4 impede a imagem de ser construída, em vez de o problema só aparecer na primeira vez que alguém usar o container.
 
-O teste 5 não roda no `docker build`: ele exige criar o projeto no Vivado, gerar o XSA e compilar o PetaLinux. O procedimento completo está em [`docs/03-petalinux-vivado.md`](docs/03-petalinux-vivado.md).
+O teste 5 não roda no `docker build`: ele exige criar o projeto no Vivado, gerar o XSA e compilar o PetaLinux. O procedimento completo está em [`docs/02-petalinux-vivado.md`](docs/02-petalinux-vivado.md).
 
 ---
 
