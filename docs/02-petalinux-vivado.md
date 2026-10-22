@@ -1,423 +1,433 @@
 
-# Cyber-Physical Systems — Ambiente PetaLinux (Docker + Tutorial)
+# Cyber-Physical Systems — PetaLinux environment (Docker + Tutorial)
+This document brings together two parts:
 
-Este documento reúne duas partes:
-
-1. **Dockerfile** — ambiente de build containerizado para o AMD/Xilinx PetaLinux 2025.2.
-2. **Tutorial** — passo a passo completo para gerar uma imagem PetaLinux a partir de um projeto de hardware feito no Vivado, incluindo o boot na placa e o deploy de uma aplicação Cyber-Physical Systems (reator Lingua Franca) na FPGA.
+1. **Dockerfile** — a containerized build environment for AMD/Xilinx PetaLinux 2025.2.
+2. **Tutorial** — a complete, step-by-step walkthrough for generating a PetaLinux image from a hardware project built in Vivado, including booting the board and deploying a Cyber-Physical Systems application (a Lingua Franca reactor) onto the FPGA.
 
 ---
 
-## Parte 1 — Dockerfile: ambiente de build para o PetaLinux 2025.2
+## Part 1 — Dockerfile: build environment for PetaLinux 2025.2
 
-### Leia antes de usar
+### Read before using
 
-1. **Base = Ubuntu 22.04, não Ubuntu 26.04.**
-   O instalador `petalinux-v2025.2-11160223-installer.run` é validado pela AMD apenas até o Ubuntu 22.04 (ver UG1144 / release notes do 2025.2). O Ubuntu 26.04 "Resolute Raccoon" (04/2026) substitui `coreutils` e `sudo` por reescritas em Rust (`uutils`/`sudo-rs`) — uma mudança de baixo nível grande o bastante para arriscar quebrar, de forma sutil, os scripts do Yocto/BitBake por baixo do PetaLinux. Ninguém documentou essa combinação funcionando ainda, então esta imagem usa 22.04, que é a combinação com suporte oficial e testada por terceiros para esta mesma versão do instalador. Se quiser arriscar o 26.04 mesmo assim, troque o `FROM` no Dockerfile — o resto do arquivo não muda.
+1. **Base = Ubuntu 22.04, not Ubuntu 26.04.**
+   The `petalinux-v2025.2-11160223-installer.run` installer is validated by AMD only up to Ubuntu 22.04 (see UG1144 / the 2025.2 release notes). Ubuntu 26.04 "Resolute Raccoon" (04/2026) replaces `coreutils` and `sudo` with Rust rewrites (`uutils`/`sudo-rs`) — a low-level change big enough to risk subtly breaking the Yocto/BitBake scripts underneath PetaLinux. Nobody has documented that combination working yet, so this image uses 22.04, which is the officially supported combination and has been tested by third parties with this same installer version. If you want to risk 26.04 anyway, change the `FROM` in the Dockerfile — the rest of the file stays the same.
 
-2. **A ISO `ubuntu-26.04-desktop-amd64.iso` não entra neste fluxo em nenhum momento.**
-   Imagem Docker não instala a partir de ISO de desktop: ela parte direto da rootfs mínima `ubuntu:22.04` do Docker Hub. Uma ISO de desktop só faria sentido para instalar Ubuntu numa VM/máquina física — não existe um passo equivalente no Dockerfile.
+2. **The `ubuntu-26.04-desktop-amd64.iso` image is not part of this flow at any point.**
+   A Docker image does not install from a desktop ISO: it starts straight from Docker Hub's minimal `ubuntu:22.04` rootfs. A desktop ISO would only make sense to install Ubuntu on a VM or a physical machine — there is no equivalent step in the Dockerfile.
 
-3. **Baixe o instalador manualmente antes do build.**
-   Faça login no site da AMD/Xilinx, baixe o arquivo `petalinux-v2025.2-11160223-installer.run` e coloque-o na mesma pasta deste Dockerfile.
+3. **Download the installer manually before the build.**
+   Log in to the AMD/Xilinx site, download `petalinux-v2025.2-11160223-installer.run` and place it in the same folder as this Dockerfile.
 
-### Como usar
+### How to use
 
 ```bash
 docker build -t petalinux:2025.2 .
 docker run -it --privileged --rm -v "$(pwd)/projects:/home/petalinux/projects" petalinux:2025.2
 ```
 
-Dentro do container, `petalinux-create`, `petalinux-config` e `petalinux-build` já funcionam direto: o entrypoint carrega o `settings.sh` automaticamente.
+Inside the container, `petalinux-create`, `petalinux-config` and `petalinux-build` work right away: the entrypoint sources `settings.sh` automatically.
 
-> **Espaço em disco:** reserve pelo menos 100–150 GB livres para a imagem + projetos de build (exigência do próprio PetaLinux, não apenas do instalador).
-
----
-
-## Parte 2 — Tutorial: criando um projeto PetaLinux a partir do Vivado/Vitis
-
-Este tutorial mostra o fluxo completo para gerar uma imagem Linux embarcado (PetaLinux) a partir de um projeto de hardware criado no Vivado: exportação do XSA, geração do Software Device Tree, criação do projeto PetaLinux, configuração, build, geração da imagem de boot e deploy final na FPGA.
-
-### Pré-requisitos
-
-- **Vivado / Vitis** 2025.2 instalados e licenciados.
-- **PetaLinux Tools** 2025.2 instalado (`/petalinux` neste tutorial).
-- BSP da placa alvo (neste exemplo, **ZCU106**).
-- Ambiente Linux com espaço em disco suficiente — o build do Yocto pode passar de 50 GB — e, de preferência, várias CPUs disponíveis para paralelizar o build.
-- **Requisito total de espaço em disco: +200 GB.**
-
-### Sumário
-
-1. [Preparando o Hardware no Vivado](#1-preparando-o-hardware-no-vivado)
-2. [Exportando o Hardware (XSA)](#2-exportando-o-hardware-xsa)
-3. [Gerar o Software Device Tree (SDT)](#3-gerar-o-software-device-tree-sdt)
-4. [Criar e configurar o projeto PetaLinux](#4-criar-e-configurar-o-projeto-petalinux)
-5. [Incorporar as características do hardware ao PetaLinux](#5-incorporar-as-características-do-hardware-ao-petalinux)
-6. [Configurar o RootFS](#6-configurar-o-rootfs)
-7. [Compilar o PetaLinux](#7-compilar-o-petalinux)
-8. [Boot via JTAG / Pen Drive](#8-boot-via-jtag--pen-drive)
-9. [Deploy na FPGA](#9-deploy-na-fpga)
-9. [Links Úteis](#10-links-uteis)
+> **Disk space:** reserve at least 100–150 GB free for the image + build projects (a requirement of PetaLinux itself, not just the installer).
 
 ---
 
-## 1. Preparando o hardware no Vivado
+## Part 2 — Tutorial: creating a PetaLinux project from Vivado/Vitis
 
-Esta seção cobre o que acontece entre o `.tar.gz` gerado pelo container e a
-exportação do XSA: criar o projeto, trazer o `ZCU106Wrapper.v` para o Block
-Design, atribuir o endereço do acelerador e gerar o bitstream.
+This tutorial shows the complete flow for generating an embedded Linux image (PetaLinux) from a hardware project created in Vivado: exporting the XSA, generating the Software Device Tree, creating the PetaLinux project, configuring it, building, generating the boot image and the final deployment onto the FPGA.
 
-> **Entrada:** `ZCU106Wrapper.v` e `Q_srl.v`, extraídos de `deploy_all_files/`
-> no `.tar.gz` produzido por `make deploy ... ARCH=arm`.
-> **Saídas:** o bitstream (gravado na PL) e o `.xsa` (consumido pelo PetaLinux).
+### Prerequisites
 
-### 1.1 Carregar o ambiente Vitis
+- **Vivado / Vitis** 2025.2 installed and licensed.
+- **PetaLinux Tools** 2025.2 installed (`/petalinux` in this tutorial).
+- The BSP of the target board (in this example, **ZCU106**).
+- A Linux environment with enough disk space — the Yocto build can exceed 50 GB — and, preferably, several CPUs available to parallelize the build.
+- **Total disk space requirement: 200+ GB.**
+
+### Contents
+
+1. [Preparing the hardware in Vivado](#1-preparing-the-hardware-in-vivado)
+2. [Exporting the hardware (XSA)](#2-exporting-the-hardware-xsa)
+3. [Generating the Software Device Tree (SDT)](#3-generating-the-software-device-tree-sdt)
+4. [Creating and configuring the PetaLinux project](#4-creating-and-configuring-the-petalinux-project)
+5. [Incorporating the hardware features into PetaLinux](#5-incorporating-the-hardware-features-into-petalinux)
+6. [Configuring the RootFS](#6-configuring-the-rootfs)
+7. [Building PetaLinux](#7-building-petalinux)
+8. [Booting via JTAG / USB stick](#8-booting-via-jtag--usb-stick)
+9. [Deploying onto the FPGA](#9-deploying-onto-the-fpga)
+10. [Useful links](#10-useful-links)
+
+---
+
+## 1. Preparing the hardware in Vivado
+
+This section covers what happens between the `.tar.gz` produced by the
+container and the XSA export: creating the project, bringing
+`ZCU106Wrapper.v` into the Block Design, assigning the accelerator's address
+and generating the bitstream.
+
+> **Input:** `ZCU106Wrapper.v` and `Q_srl.v`, extracted from
+> `deploy_all_files/` in the `.tar.gz` produced by
+> `make deploy ... ARCH=arm`.
+> **Outputs:** the bitstream (programmed into the PL) and the `.xsa`
+> (consumed by PetaLinux).
+
+### 1.1 Load the Vitis environment
 
 ```bash
-source <diretório de instalação do Vitis>/settings.sh
+source <Vitis installation directory>/settings.sh
 ```
 
-Exemplo:
+Example:
 
 ```bash
 source ~/Music/2025.2/Vitis/settings.sh
 ```
 
 <p align="center">
-<img title="Carregando o ambiente Vitis via source" alt="Terminal executando o source do settings.sh do Vitis" src="../images/passo1.png" width="100%" height="100%">
+<img title="Loading the Vitis environment via source" alt="Terminal running source on the Vitis settings.sh" src="../images/passo1.png" width="100%" height="100%">
 </p>
 
-### 1.2 Criar o projeto
+### 1.2 Create the project
 
-**File → Project → New**, e avance no assistente.
-
-<p align="center">
-<img title="Assistente de novo projeto" alt="Tela inicial do assistente New Project do Vivado" src="../images/passo-01.png" width="100%" height="100%">
-</p>
+**File → Project → New**, then step through the wizard.
 
 <p align="center">
-<img title="Assistente de novo projeto" alt="Segunda tela do assistente New Project" src="../images/passo-02.png" width="100%" height="100%">
-</p>
-
-Dê nome e escolha o diretório do projeto (neste tutorial, `project_14` em
-`/home/xmen`):
-
-<p align="center">
-<img title="Nome e local do projeto" alt="Campos de nome e diretório do projeto preenchidos" src="../images/passo-03.png" width="100%" height="100%">
-</p>
-
-Selecione **RTL Project** e deixe *Do not specify sources at this time*
-desmarcado — os arquivos `.v` serão adicionados no próximo passo:
-
-<p align="center">
-<img title="Tipo de projeto RTL" alt="Seleção de RTL Project no assistente" src="../images/passo-04.png" width="100%" height="100%">
-</p>
-
-### 1.3 Trazer o RTL gerado pelo compilador
-
-Copie o `<projeto>_<timestamp>_deploy.tar.gz` do container para o host onde o
-Vivado está instalado e extraia:
-
-<p align="center">
-<img title="Copiando e extraindo o pacote de deploy" alt="Gerenciador de arquivos com o .tar.gz extraído em deploy_all_files" src="../images/passo-05.png" width="100%" height="100%">
-</p>
-
-Na etapa **Add Sources** do assistente, escolha *Add or create design sources*:
-
-<p align="center">
-<img title="Adicionar arquivos de design" alt="Tela Add Sources do assistente de novo projeto" src="../images/passo-07.png" width="100%" height="100%">
-</p>
-
-Navegue até a pasta extraída e selecione **os dois** arquivos: `ZCU106Wrapper.v`
-e `Q_srl.v`.
-
-> **O `Q_srl.v` não é opcional.** Ele é o único arquivo Verilog do
-> `fpga-tidbits` que não é gerado pelo Chisel, e é instanciado por
-> `SRLQueue`/`FPGAQueue` dentro do wrapper. Sem ele, o `ZCU106Wrapper` fica
-> incompleto e **aparece acinzentado** (incompatível) na hora de adicioná-lo ao
-> Block Design — ver 1.6.
-
-<p align="center">
-<img title="Seleção dos arquivos Verilog" alt="Navegador de arquivos com ZCU106Wrapper.v e Q_srl.v selecionados" src="../images/passo-08.png" width="100%" height="100%">
-</p>
-
-Na seleção de part, vá à aba **Boards** e procure por `zcu106`:
-
-<p align="center">
-<img title="Seleção da part" alt="Tela de seleção de part do assistente" src="../images/passo-09.png" width="100%" height="100%">
+<img title="New project wizard" alt="Opening screen of Vivado's New Project wizard" src="../images/passo-01.png" width="100%" height="100%">
 </p>
 
 <p align="center">
-<img title="Placa ZCU106 selecionada" alt="Aba Boards com a Zynq UltraScale+ ZCU106 Evaluation Platform selecionada" src="../images/passo-10.png" width="100%" height="100%">
+<img title="New project wizard" alt="Second screen of the New Project wizard" src="../images/passo-02.png" width="100%" height="100%">
 </p>
 
-Isso define a part `xczu7ev-ffvc1156-2-e` — o mesmo part number registrado no
-`fpgaPartMap` do compilador para a `ZCU106`. Confirme o resumo e finalize:
+Give it a name and choose the project directory (in this tutorial,
+`project_14` under `/home/xmen`):
 
 <p align="center">
-<img title="Resumo do novo projeto" alt="Tela final do assistente com o resumo do projeto" src="../images/passo-11.png" width="100%" height="100%">
+<img title="Project name and location" alt="Project name and directory fields filled in" src="../images/passo-03.png" width="100%" height="100%">
 </p>
 
-Com o projeto criado, a aba Sources mostra a hierarquia completa do acelerador —
-`CodesignTopReactor`, `Hardware_ZCU106` e os reactors que você escreveu no `.lf`
-(`Accel_Sum`, `Accel_Mult`, `Accel_Subtrac`), além do `RegFile` e dos adaptadores
-AXI:
+Select **RTL Project** and leave *Do not specify sources at this time*
+unchecked — the `.v` files are added in the next step:
 
 <p align="center">
-<img title="Hierarquia do projeto" alt="Project Summary com a hierarquia do ZCU106Wrapper expandida" src="../images/passo-12.png" width="100%" height="100%">
+<img title="RTL project type" alt="RTL Project selected in the wizard" src="../images/passo-04.png" width="100%" height="100%">
 </p>
 
-É um bom momento para conferir que os reactors do seu `.lf` realmente viraram
-hardware — cada um aparece como um módulo próprio.
+### 1.3 Bring in the RTL generated by the compiler
 
-### 1.4 Criar o Block Design
+Copy `<project>_<timestamp>_deploy.tar.gz` from the container to the host
+where Vivado is installed and extract it:
+
+<p align="center">
+<img title="Copying and extracting the deploy package" alt="File manager with the .tar.gz extracted into deploy_all_files" src="../images/passo-05.png" width="100%" height="100%">
+</p>
+
+In the wizard's **Add Sources** step, choose *Add or create design sources*:
+
+<p align="center">
+<img title="Adding design files" alt="Add Sources screen of the New Project wizard" src="../images/passo-07.png" width="100%" height="100%">
+</p>
+
+Navigate to the extracted folder and select **both** files:
+`ZCU106Wrapper.v` and `Q_srl.v`.
+
+> **`Q_srl.v` is not optional.** It is the only Verilog file in
+> `fpga-tidbits` that is not generated by Chisel, and it is instantiated by
+> `SRLQueue`/`FPGAQueue` inside the wrapper. Without it, `ZCU106Wrapper` is
+> incomplete and **appears greyed out** (incompatible) when you try to add it
+> to the Block Design — see 1.6.
+
+<p align="center">
+<img title="Selecting the Verilog files" alt="File browser with ZCU106Wrapper.v and Q_srl.v selected" src="../images/passo-08.png" width="100%" height="100%">
+</p>
+
+In the part selection, go to the **Boards** tab and search for `zcu106`:
+
+<p align="center">
+<img title="Part selection" alt="Part selection screen of the wizard" src="../images/passo-09.png" width="100%" height="100%">
+</p>
+
+<p align="center">
+<img title="ZCU106 board selected" alt="Boards tab with the Zynq UltraScale+ ZCU106 Evaluation Platform selected" src="../images/passo-10.png" width="100%" height="100%">
+</p>
+
+That sets the part to `xczu7ev-ffvc1156-2-e` — the same part number
+registered in the compiler's `fpgaPartMap` for `ZCU106`. Confirm the summary
+and finish:
+
+<p align="center">
+<img title="New project summary" alt="Final wizard screen with the project summary" src="../images/passo-11.png" width="100%" height="100%">
+</p>
+
+With the project created, the Sources tab shows the accelerator's full
+hierarchy — `CodesignTopReactor`, `Hardware_ZCU106` and the reactors you
+wrote in the `.lf` (`Accel_Sum`, `Accel_Mult`, `Accel_Subtrac`), plus the
+`RegFile` and the AXI adapters:
+
+<p align="center">
+<img title="Project hierarchy" alt="Project Summary with the ZCU106Wrapper hierarchy expanded" src="../images/passo-12.png" width="100%" height="100%">
+</p>
+
+This is a good moment to check that the reactors from your `.lf` really did
+turn into hardware — each one shows up as a module of its own.
+
+### 1.4 Create the Block Design
 
 **IP INTEGRATOR → Create Block Design**:
 
 <p align="center">
-<img title="Hierarquia e Create Block Design" alt="Reactors destacados na hierarquia e seta apontando para Create Block Design" src="../images/passo-13.png" width="100%" height="100%">
+<img title="Hierarchy and Create Block Design" alt="Reactors highlighted in the hierarchy and an arrow pointing to Create Block Design" src="../images/passo-13.png" width="100%" height="100%">
 </p>
 
-Aceite o nome padrão (`design_1`):
+Accept the default name (`design_1`):
 
 <p align="center">
-<img title="Nome do Block Design" alt="Diálogo Create Block Design com o nome design_1" src="../images/passo-14.png" width="100%" height="100%">
+<img title="Block Design name" alt="Create Block Design dialog with the name design_1" src="../images/passo-14.png" width="100%" height="100%">
 </p>
 
-### 1.5 Adicionar o processador
+### 1.5 Add the processor
 
-No diagrama vazio, clique em **+** (Add IP), digite `zynq` e escolha
+In the empty diagram, click **+** (Add IP), type `zynq` and choose
 **Zynq UltraScale+ MPSoC**:
 
 <p align="center">
-<img title="Adicionando o Zynq UltraScale+ MPSoC" alt="Busca por zynq no catálogo de IP" src="../images/passo-15.png" width="100%" height="100%">
+<img title="Adding the Zynq UltraScale+ MPSoC" alt="Searching for zynq in the IP catalog" src="../images/passo-15.png" width="100%" height="100%">
 </p>
 
-Rode o **Run Block Automation** oferecido na barra verde: ele aplica as
-predefinições da ZCU106 (DDR, UART, Ethernet, clocks).
+Run the **Run Block Automation** offered in the green bar: it applies the
+ZCU106 presets (DDR, UART, Ethernet, clocks).
 
-### 1.6 Adicionar o `ZCU106Wrapper`
+### 1.6 Add the `ZCU106Wrapper`
 
-O wrapper é RTL do projeto, não um IP do catálogo. Clique com o botão direito em
-uma área vazia do diagrama e escolha **Add Module…**:
+The wrapper is project RTL, not a catalog IP. Right-click an empty area of
+the diagram and choose **Add Module…**:
 
 <p align="center">
-<img title="Menu Add Module" alt="Menu de contexto do diagrama com Add Module destacado" src="../images/passo-16.png" width="100%" height="100%">
+<img title="Add Module menu" alt="Diagram context menu with Add Module highlighted" src="../images/passo-16.png" width="100%" height="100%">
 </p>
 
-Selecione `ZCU106Wrapper` na lista:
+Select `ZCU106Wrapper` from the list:
 
 <p align="center">
-<img title="Seleção do módulo ZCU106Wrapper" alt="Diálogo Add Module com ZCU106Wrapper selecionado" src="../images/passo-17.png" width="100%" height="100%">
+<img title="Selecting the ZCU106Wrapper module" alt="Add Module dialog with ZCU106Wrapper selected" src="../images/passo-17.png" width="100%" height="100%">
 </p>
 
-> **Se o `ZCU106Wrapper` aparecer acinzentado:** falta o `Q_srl.v` no projeto
-> (1.3). Os submódulos aparecem normalmente e só o topo fica desabilitado,
-> porque o Vivado o trata como hierarquia incompleta. Adicione o arquivo por
-> **Add Sources** e reabra o diálogo. Desmarcar *Hide incompatible modules* só
-> revela o problema — não o resolve.
+> **If `ZCU106Wrapper` appears greyed out:** `Q_srl.v` is missing from the
+> project (1.3). The submodules show up normally and only the top is
+> disabled, because Vivado treats it as an incomplete hierarchy. Add the file
+> through **Add Sources** and reopen the dialog. Unchecking *Hide
+> incompatible modules* only reveals the problem — it does not fix it.
 
-O bloco entra no diagrama já com as interfaces AXI agrupadas: `csr` (AXI4-Lite,
-slave) e `mem0..mem3` (AXI4, master), mais `clock` e `reset`.
+The block enters the diagram with its AXI interfaces already grouped: `csr`
+(AXI4-Lite, slave) and `mem0..mem3` (AXI4, master), plus `clock` and `reset`.
 
-### 1.7 Periféricos opcionais
+### 1.7 Optional peripherals
 
-LEDs e dip switches não são exigidos pelo fluxo — use se quiser um sinal visual
-de que o sistema está vivo. **Add IP → `AXI GPIO`**:
+LEDs and dip switches are not required by the flow — use them if you want a
+visual sign that the system is alive. **Add IP → `AXI GPIO`**:
 
 <p align="center">
-<img title="Adicionando o AXI GPIO" alt="Busca por AXI GPIO no catálogo de IP" src="../images/passo-18.png" width="100%" height="100%">
+<img title="Adding the AXI GPIO" alt="Searching for AXI GPIO in the IP catalog" src="../images/passo-18.png" width="100%" height="100%">
 </p>
 
-Neste ponto o diagrama tem os três blocos, ainda sem conexões:
+At this point the diagram has all three blocks, still unconnected:
 
 <p align="center">
-<img title="Blocos adicionados ao diagrama" alt="ZCU106Wrapper, AXI GPIO e Zynq UltraScale+ MPSoC no diagrama, desconectados" src="../images/passo-19.png" width="100%" height="100%">
+<img title="Blocks added to the diagram" alt="ZCU106Wrapper, AXI GPIO and Zynq UltraScale+ MPSoC in the diagram, disconnected" src="../images/passo-19.png" width="100%" height="100%">
 </p>
 
-### 1.8 Conexões automáticas
+### 1.8 Automatic connections
 
-Clique em **Run Connection Automation** na barra verde e marque tudo. A primeira
-passada conecta o `csr` do wrapper e as interfaces do GPIO ao
-`M_AXI_HPM0_FPD` do PS, criando o `AXI SmartConnect` e o `Processor System Reset`:
+Click **Run Connection Automation** in the green bar and tick everything. The
+first pass connects the wrapper's `csr` and the GPIO interfaces to the PS's
+`M_AXI_HPM0_FPD`, creating the `AXI SmartConnect` and the
+`Processor System Reset`:
 
 <p align="center">
-<img title="Connection Automation — csr e GPIO" alt="Diálogo Run Connection Automation com csr do ZCU106Wrapper e interfaces do AXI GPIO marcadas" src="../images/passo-20.png" width="100%" height="100%">
+<img title="Connection Automation — csr and GPIO" alt="Run Connection Automation dialog with the ZCU106Wrapper csr and the AXI GPIO interfaces ticked" src="../images/passo-20.png" width="100%" height="100%">
 </p>
 
-Rode novamente para as portas de memória: `mem0..mem3` do wrapper em direção ao
-PS:
+Run it again for the memory ports: the wrapper's `mem0..mem3` towards the PS:
 
 <p align="center">
-<img title="Connection Automation — portas de memória" alt="Diálogo Run Connection Automation com mem0 a mem3 marcadas" src="../images/passo-21.png" width="100%" height="100%">
+<img title="Connection Automation — memory ports" alt="Run Connection Automation dialog with mem0 through mem3 ticked" src="../images/passo-21.png" width="100%" height="100%">
 </p>
 
-> **Nota:** o acelerador usa efetivamente `mem0`; `mem1..mem3` são portas
-> plugadas com defaults pelo `AXIPlatformWrapper`. Conectá-las não faz mal, e
-> deixá-las desconectadas também funciona — reduz a fiação do diagrama.
+> **Note:** the accelerator effectively uses `mem0`; `mem1..mem3` are ports
+> plugged with defaults by `AXIPlatformWrapper`. Connecting them does no
+> harm, and leaving them unconnected also works — it reduces the diagram's
+> wiring.
 
-### 1.9 Clock e reset
+### 1.9 Clock and reset
 
-O `pl_clk0` do PS alimenta o wrapper, o `Processor System Reset` e os
-SmartConnects. Neste tutorial ele está em **100 MHz**.
+The PS's `pl_clk0` feeds the wrapper, the `Processor System Reset` and the
+SmartConnects. In this tutorial it is set to **100 MHz**.
 
-> **Esse número precisa ir para o `.lf`.** O RTL gerado incrementa os
-> registradores de tempo lógico (`physicalTag`, `regClock`) a cada pulso de
-> clock, somando o valor de `clock-period`. Com 100 MHz:
+> **That number has to make it into the `.lf`.** The generated RTL
+> increments the logical time registers (`physicalTag`, `regClock`) on every
+> clock pulse, adding the value of `clock-period`. At 100 MHz:
 >
 > ```lf
 > target Codesign {
 >   fpgaBoard: ZCU106,
->   clock-period: 10 nsec   // 10 ns = 100 MHz, igual ao pl_clk0
+>   clock-period: 10 nsec   // 10 ns = 100 MHz, same as pl_clk0
 > }
 > ```
 >
-> O default é 1 nsec (1 GHz). Gerar o RTL com o default e sintetizar a 100 MHz
-> deixa toda a coordenação de tags 10× dessincronizada do tempo real.
+> The default is 1 nsec (1 GHz). Generating the RTL with the default and
+> synthesizing at 100 MHz leaves the whole tag coordination 10× out of sync
+> with real time.
 
->**Verifique o reset.** A entrada `reset` do `ZCU106Wrapper` é
-> **ativa-em-alto**: ligue em `peripheral_reset` do `Processor System Reset`,
-> **não** em `peripheral_aresetn`. Invertido, o acelerador fica permanentemente
-> em reset — a síntese passa sem reclamar e a falha só aparece na leitura de
-> assinatura, em tempo de execução.
+>**Check the reset.** The `ZCU106Wrapper` `reset` input is
+> **active-high**: wire it to `peripheral_reset` of the
+> `Processor System Reset`, **not** to `peripheral_aresetn`. Inverted, the
+> accelerator stays permanently in reset — synthesis passes without
+> complaining and the failure only shows up at run time, in the signature
+> read.
 
-### 1.10 Depuração com System ILA (opcional)
+### 1.10 Debugging with a System ILA (optional)
 
-Para observar as transações AXI no Hardware Manager, clique com o botão direito
-sobre a conexão do `csr` e escolha **Debug**:
-
-<p align="center">
-<img title="Marcando a conexão para debug" alt="Menu de contexto da conexão AXI com a opção Debug destacada" src="../images/passo-22.png" width="100%" height="100%">
-</p>
-
-O Connection Automation passa então a oferecer a inserção do **System ILA**. Os defaults
-(*Data and Trigger* em todos os canais, clock do `pl_clk0`) servem:
+To observe the AXI transactions in the Hardware Manager, right-click the
+`csr` connection and choose **Debug**:
 
 <p align="center">
-<img title="Inserção do System ILA" alt="Diálogo Run Connection Automation configurando o System ILA" src="../images/passo-23.png" width="100%" height="100%">
+<img title="Marking the connection for debug" alt="Context menu of the AXI connection with the Debug option highlighted" src="../images/passo-22.png" width="100%" height="100%">
 </p>
 
-### 1.11 Endereço do acelerador
-
-Abra a aba **Address Editor**. Se estiver vazia, clique em *Generate Address Map*:
+Connection Automation then offers to insert the **System ILA**. The defaults
+(*Data and Trigger* on every channel, clock from `pl_clk0`) are fine:
 
 <p align="center">
-<img title="Address Map ainda não gerado" alt="Aba Address Map com o link Generate Address Map" src="../images/passo-24.png" width="100%" height="100%">
+<img title="System ILA insertion" alt="Run Connection Automation dialog configuring the System ILA" src="../images/passo-23.png" width="100%" height="100%">
 </p>
 
-Por padrão o Vivado atribui ao `csr` um endereço alto com range de 4G — no
-exemplo, `0x5_0000_0000`:
+### 1.11 Accelerator address
+
+Open the **Address Editor** tab. If it is empty, click *Generate Address
+Map*:
 
 <p align="center">
-<img title="Endereço atribuído automaticamente" alt="Address Editor mostrando o csr em 0x5_0000_0000 com range 4G" src="../images/passo-25.png" width="100%" height="100%">
+<img title="Address Map not generated yet" alt="Address Map tab with the Generate Address Map link" src="../images/passo-24.png" width="100%" height="100%">
 </p>
 
-**Altere para `0xA000_0000` com range `64K`**, a faixa convencional de
-periféricos da PL no MPSoC:
+By default Vivado assigns `csr` a high address with a 4G range — in the
+example, `0x5_0000_0000`:
 
 <p align="center">
-<img title="Endereço corrigido do csr" alt="Address Editor com o csr em 0xA000_0000 e range 64K" src="../images/passo-27.png" width="100%" height="100%">
+<img title="Automatically assigned address" alt="Address Editor showing csr at 0x5_0000_0000 with a 4G range" src="../images/passo-25.png" width="100%" height="100%">
 </p>
 
-> **Por que esse endereço importa.** Ele está definido diretamente no código (hardcoded).
+**Change it to `0xA000_0000` with a `64K` range**, the conventional PL
+peripheral range on the MPSoC:
+
+<p align="center">
+<img title="Corrected csr address" alt="Address Editor with csr at 0xA000_0000 and a 64K range" src="../images/passo-27.png" width="100%" height="100%">
+</p>
+
+> **Why that address matters.** It is defined directly in the code
+> (hardcoded).
 >
-> 1. O `sdtgen` o escreve no device tree como o nó `ZCU106Wrapper@a0000000`.
-> 2. O kernel expõe esse nome em `/sys/class/uio/uioN/name`.
-> 3. O `platform-mpsoc-uio.cpp` procura pela substring `"ZCU106Wrapper"` nesse
->    arquivo para descobrir qual `/dev/uioN` abrir.
+> 1. `sdtgen` writes it into the device tree as the node
+>    `ZCU106Wrapper@a0000000`.
+> 2. The kernel exposes that name in `/sys/class/uio/uioN/name`.
+> 3. `platform-mpsoc-uio.cpp` looks for the substring `"ZCU106Wrapper"` in
+>    that file to work out which `/dev/uioN` to open.
 >
-> Como a busca é por substring, mudar o endereço não quebra o driver — mas
-> renomear o wrapper, sim. E o range de 4G do default faz o acelerador ocupar
-> uma faixa absurda do mapa de endereços; 64K é o tamanho real do regfile.
+> Because the lookup is by substring, changing the address does not break the
+> driver — but renaming the wrapper does. And the default 4G range makes the
+> accelerator occupy an absurd slice of the address map; 64K is the regfile's
+> real size.
 
-### 1.12 Gerar o wrapper HDL
+### 1.12 Generate the HDL wrapper
 
-Valide o diagrama com **Validate Design** (`F6`). Depois, na aba Sources, clique
-com o botão direito em `design_1` e escolha **Create HDL Wrapper** (deixe o
-Vivado gerenciar):
-
-<p align="center">
-<img title="Create HDL Wrapper" alt="Menu de contexto do design_1 com Create HDL Wrapper e Generate Output Products" src="../images/passo-28.png" width="100%" height="100%">
-</p>
-
-Defina o `design_1_wrapper` como topo do projeto (**Set as Top**):
+Validate the diagram with **Validate Design** (`F6`). Then, in the Sources
+tab, right-click `design_1` and choose **Create HDL Wrapper** (let Vivado
+manage it):
 
 <p align="center">
-<img title="Definindo o topo do projeto" alt="Menu de contexto do design_1_wrapper com Set as Top destacado" src="../images/passo-29.png" width="100%" height="100%">
+<img title="Create HDL Wrapper" alt="design_1 context menu with Create HDL Wrapper and Generate Output Products" src="../images/passo-28.png" width="100%" height="100%">
 </p>
 
-O `design_1_wrapper` passa a aparecer em negrito na hierarquia:
+Set `design_1_wrapper` as the project top (**Set as Top**):
 
 <p align="center">
-<img title="Projeto pronto para síntese" alt="Hierarquia com design_1_wrapper como topo e o diagrama completo" src="../images/passo-30.png" width="100%" height="100%">
+<img title="Setting the project top" alt="design_1_wrapper context menu with Set as Top highlighted" src="../images/passo-29.png" width="100%" height="100%">
 </p>
 
-### 1.13 Gerar o bitstream
-
-**PROGRAM AND DEBUG → Generate Bitstream**. Ajuste *Number of jobs* para o
-número de núcleos disponíveis:
+`design_1_wrapper` then appears in bold in the hierarchy:
 
 <p align="center">
-<img title="Launch Runs do Generate Bitstream" alt="Diálogo Launch Runs com o número de jobs configurado" src="../images/passo-31.png" width="100%" height="100%">
+<img title="Project ready for synthesis" alt="Hierarchy with design_1_wrapper as top and the complete diagram" src="../images/passo-30.png" width="100%" height="100%">
 </p>
 
-Síntese e implementação levam dezenas de minutos. Com `write_bitstream Complete`
-na barra de status, siga para a exportação do XSA.
+### 1.13 Generate the bitstream
 
-
-## 2. Exportando o Hardware (XSA)
-
-Com o hardware validado, o próximo passo é gerar o arquivo **XSA** (Xilinx Support Archive), que descreve o hardware e será consumido pelo PetaLinux para criar o BSP (Board Support Package).
-
-No Vivado, vá em **File → Export → Export Hardware** e siga o assistente:
-
-**Passo 1 – Início do assistente de exportação.** Confirme que deseja exportar o hardware do projeto atual.
+**PROGRAM AND DEBUG → Generate Bitstream**. Set *Number of jobs* to the
+number of cores available:
 
 <p align="center">
-<img title="Assistente de exportação de hardware" alt="Tela inicial do assistente Export Hardware do Vivado" src="../images/passo-32.png" width="100%" height="100%">
+<img title="Generate Bitstream Launch Runs" alt="Launch Runs dialog with the number of jobs configured" src="../images/passo-31.png" width="100%" height="100%">
+</p>
+
+Synthesis and implementation take tens of minutes. Once the status bar shows
+`write_bitstream Complete`, move on to exporting the XSA.
+
+
+## 2. Exporting the hardware (XSA)
+
+With the hardware validated, the next step is generating the **XSA** (Xilinx Support Archive) file, which describes the hardware and will be consumed by PetaLinux to create the BSP (Board Support Package).
+
+In Vivado, go to **File → Export → Export Hardware** and follow the wizard:
+
+**Step 1 – Start of the export wizard.** Confirm that you want to export the current project's hardware.
+
+<p align="center">
+<img title="Hardware export wizard" alt="Opening screen of Vivado's Export Hardware wizard" src="../images/passo-32.png" width="100%" height="100%">
 </p>
 
 <p align="center">
-<img title="Assistente de exportação de hardware" alt="Segunda tela do assistente Export Hardware" src="../images/passo4.png" width="100%" height="100%">
+<img title="Hardware export wizard" alt="Second screen of the Export Hardware wizard" src="../images/passo4.png" width="100%" height="100%">
 </p>
 
-**Passo 2 – Incluir o bitstream.** Marque a opção **Include Bitstream**, para que o arquivo XSA contenha a configuração completa do FPGA.
+**Step 2 – Include the bitstream.** Tick the **Include Bitstream** option, so that the XSA file contains the FPGA's complete configuration.
 
 <p align="center">
-<img title="Opção Include Bitstream marcada" alt="Tela do assistente com a opção Include Bitstream selecionada" src="../images/passo5.png" width="100%" height="100%">
+<img title="Include Bitstream option ticked" alt="Wizard screen with the Include Bitstream option selected" src="../images/passo5.png" width="100%" height="100%">
 </p>
 
-**Passo 3 – Escolher o diretório de destino.** Neste exemplo:
+**Step 3 – Choose the destination directory.** In this example:
 
 ```bash
-/home/xmen/workspace/<nome_do_projeto>
+/home/xmen/workspace/<project_name>
 ```
 
 <p align="center">
-<img title="Seleção do diretório de exportação" alt="Tela de seleção do diretório onde o XSA será salvo" src="../images/passo6.png" width="100%" height="100%">
+<img title="Export directory selection" alt="Screen for selecting the directory where the XSA will be saved" src="../images/passo6.png" width="100%" height="100%">
 </p>
 
-**Passo 4 – Confirmar a exportação.** Verifique se o arquivo `.xsa` foi gerado no diretório correto:
+**Step 4 – Confirm the export.** Check that the `.xsa` file was generated in the right directory:
 
 ```bash
 cd /home/xmen/workspace
 ls
-# <nome do projeto>.xsa
+# <project name>.xsa
 ```
 
 <p align="center">
-<img title="Confirmação do arquivo XSA gerado" alt="Terminal mostrando o arquivo .xsa gerado no diretório de workspace" src="../images/passo8.png" width="100%" height="100%">
+<img title="Confirming the generated XSA file" alt="Terminal showing the generated .xsa file in the workspace directory" src="../images/passo8.png" width="100%" height="100%">
 </p>
 
-## 3. Gerar o Software Device Tree (SDT)
+## 3. Generating the Software Device Tree (SDT)
 
-Crie um script Tcl chamado `sdt.tcl`:
+Create a Tcl script called `sdt.tcl`:
 
 <p align="center">
-<img title="Criando o script sdt.tcl" alt="Editor de texto criando o arquivo sdt.tcl" src="../images/passo9.png" width="100%" height="100%">
+<img title="Creating the sdt.tcl script" alt="Text editor creating the sdt.tcl file" src="../images/passo9.png" width="100%" height="100%">
 </p>
 
-Conteúdo do `sdt.tcl`:
+Contents of `sdt.tcl`:
 
 ```tcl
 set outdir [lindex $argv 1]
@@ -427,15 +437,15 @@ sdtgen set_dt_param -xsa $xsa -dir $outdir -board_dts zcu106-reva
 sdtgen generate_sdt
 ```
 
-> **Nota:** Mais detalhes sobre o TCL em [TCL File Mode - Xilinx System-Device-Tree-xlnx](https://github.com/Xilinx/system-device-tree-xlnx/blob/master/README.md).
+> **Note:** more details about the TCL in [TCL File Mode - Xilinx System-Device-Tree-xlnx](https://github.com/Xilinx/system-device-tree-xlnx/blob/master/README.md).
 
-> **Nota:** Ajuste `zcu106-reva` para o identificador correspondente à sua placa, caso não esteja usando uma ZCU106.
+> **Note:** adjust `zcu106-reva` to the identifier matching your board, if you are not using a ZCU106.
 
 <p align="center">
-<img title="Conteúdo do script sdt.tcl" alt="Conteúdo do arquivo sdt.tcl aberto no editor" src="../images/passo10.png" width="100%" height="100%">
+<img title="Contents of the sdt.tcl script" alt="Contents of the sdt.tcl file open in the editor" src="../images/passo10.png" width="100%" height="100%">
 </p>
 
-Confirme que o arquivo foi criado com sucesso:
+Confirm that the file was created successfully:
 
 ```bash
 cd /home/xmen/workspace/
@@ -443,40 +453,40 @@ cat sdt.tcl
 ```
 
 <p align="center">
-<img title="Conferindo o conteúdo do sdt.tcl" alt="Terminal exibindo o conteúdo do sdt.tcl com cat" src="../images/passo11.png" width="100%" height="100%">
+<img title="Checking the contents of sdt.tcl" alt="Terminal displaying the contents of sdt.tcl with cat" src="../images/passo11.png" width="100%" height="100%">
 </p>
 
-Execute o script com `xsct`, a partir do diretório de workspace:
+Run the script with `xsct`, from the workspace directory:
 
 ```bash
 cd /home/xmen/workspace/
 ```
 
-Sintaxe geral:
+General syntax:
 
 ```bash
-xsct sdt.tcl <caminho_do_arquivo_XSA> sdt_outdir
+xsct sdt.tcl <path_to_XSA_file> sdt_outdir
 ```
 
-Exemplo usado neste tutorial:
+The example used in this tutorial:
 
 ```bash
 xsct sdt.tcl design_1_wrapper.xsa sdt_outdir
 ```
 
 <p align="center">
-<img title="Execução do xsct para gerar o SDT" alt="Terminal executando xsct sdt.tcl" src="../images/passo12.png" width="100%" height="100%">
+<img title="Running xsct to generate the SDT" alt="Terminal running xsct sdt.tcl" src="../images/passo12.png" width="100%" height="100%">
 </p>
 
 <p align="center">
-<img title="Saída da geração do Software Device Tree" alt="Terminal mostrando o processamento do sdtgen" src="../images/passo13.png" width="100%" height="100%">
+<img title="Output of the Software Device Tree generation" alt="Terminal showing sdtgen processing" src="../images/passo13.png" width="100%" height="100%">
 </p>
 
-Ao final, o diretório `sdt_outdir` deve conter os arquivos de device tree gerados a partir do hardware exportado.
+At the end, the `sdt_outdir` directory should contain the device tree files generated from the exported hardware.
 
-## 4. Criar e configurar o projeto PetaLinux
+## 4. Creating and configuring the PetaLinux project
 
-Vá até o diretório de instalação do PetaLinux e carregue o ambiente:
+Go to the PetaLinux installation directory and load the environment:
 
 ```bash
 cd /petalinux
@@ -484,293 +494,293 @@ source settings.sh
 ```
 
 <p align="center">
-<img title="Carregando o ambiente PetaLinux" alt="Terminal executando source settings.sh do PetaLinux" src="../images/passo17.png" width="100%" height="100%">
+<img title="Loading the PetaLinux environment" alt="Terminal running source settings.sh for PetaLinux" src="../images/passo17.png" width="100%" height="100%">
 </p>
 
-Após o carregamento, volte ao diretório do projeto:
+Once it is loaded, go back to the project directory:
 
 ```bash
 cd -
 ```
 
-Crie o projeto PetaLinux a partir do BSP da placa:
+Create the PetaLinux project from the board's BSP:
 
 ```bash
-petalinux-create -t project -s <caminho_do_arquivo>.bsp
+petalinux-create -t project -s <path_to_file>.bsp
 ```
 
-Exemplo usado neste tutorial:
+The example used in this tutorial:
 
 ```bash
 petalinux-create -t project -s /petalinux/xilinx-zcu106-v2025.2-11160223.bsp
 ```
 
-Após a execução, o diretório base do projeto deve conter a estrutura padrão de um projeto PetaLinux:
+After it runs, the project's base directory should contain the standard structure of a PetaLinux project:
 
 <p align="center">
-<img title="Estrutura do projeto PetaLinux criado" alt="Listagem de diretórios do projeto PetaLinux recém-criado" src="../images/passo18.png" width="100%" height="100%">
+<img title="Structure of the created PetaLinux project" alt="Directory listing of the freshly created PetaLinux project" src="../images/passo18.png" width="100%" height="100%">
 </p>
 
-## 5. Incorporar as características do hardware ao PetaLinux
+## 5. Incorporating the hardware features into PetaLinux
 
-Entre no diretório do projeto criado (o nome varia conforme a versão do PetaLinux):
+Enter the directory of the project you created (the name varies with the PetaLinux version):
 
 ```bash
 cd xilinx-zcu106-20xx.x
 ```
 
-Neste tutorial:
+In this tutorial:
 
 ```bash
 cd xilinx-zcu106-2025.2
 ```
 
-Aponte o projeto para o hardware exportado (diretório do SDT gerado na etapa 3):
+Point the project at the exported hardware (the SDT directory generated in step 3):
 
 ```bash
 petalinux-config --get-hw-description ../sdt_outdir
 ```
 
 <p align="center">
-<img title="Importando a descrição de hardware" alt="Terminal executando petalinux-config --get-hw-description" src="../images/passo19.png" width="100%" height="100%">
+<img title="Importing the hardware description" alt="Terminal running petalinux-config --get-hw-description" src="../images/passo19.png" width="100%" height="100%">
 </p>
 
-### 5.1 Threads paralelas de build
+### 5.1 Parallel build threads
 
-No menu de configuração, acesse:
+In the configuration menu, go to:
 
 **PetaLinux System Configuration → Yocto Settings → Parallel Thread Execution**
 
 <p align="center">
-<img title="Menu de configuração de threads paralelas" alt="Menu ncurses do PetaLinux System Configuration em Yocto Settings" src="../images/passo20.png" width="100%" height="100%">
+<img title="Parallel thread configuration menu" alt="PetaLinux System Configuration ncurses menu under Yocto Settings" src="../images/passo20.png" width="100%" height="100%">
 </p>
 
-Verifique a quantidade de CPUs disponíveis no seu ambiente de trabalho:
+Check how many CPUs are available in your working environment:
 
 ```bash
 neofetch
 ```
 
 <p align="center">
-<img title="Verificando núcleos de CPU disponíveis" alt="Saída do neofetch mostrando informações da CPU" src="../images/cpuinfo.png" width="100%" height="100%">
+<img title="Checking the available CPU cores" alt="neofetch output showing CPU information" src="../images/cpuinfo.png" width="100%" height="100%">
 </p>
 
-Neste exemplo, um Intel i9-14900F com 32 núcleos:
+In this example, an Intel i9-14900F with 32 cores:
 
 <p align="center">
-<img title="Detalhe da CPU utilizada no exemplo" alt="Detalhe do processador Intel i9-14900F com 32 núcleos" src="../images/passo21.png" width="100%" height="100%">
+<img title="Detail of the CPU used in the example" alt="Detail of the Intel i9-14900F processor with 32 cores" src="../images/passo21.png" width="100%" height="100%">
 </p>
 
-Defina os campos de paralelismo (**BB Number of Threads**, **PARALLEL_MAKE**, etc.) de acordo com a quantidade de núcleos disponível, para acelerar o build:
+Set the parallelism fields (**BB Number of Threads**, **PARALLEL_MAKE**, etc.) according to the number of cores available, to speed up the build:
 
 <p align="center">
-<img title="Configurando o número de threads paralelas" alt="Campos de configuração de threads preenchidos com o número de núcleos" src="../images/passo22.png" width="100%" height="100%">
+<img title="Configuring the number of parallel threads" alt="Thread configuration fields filled in with the number of cores" src="../images/passo22.png" width="100%" height="100%">
 </p>
 
-### 5.2 Argumentos de boot do kernel (UIO genérico)
+### 5.2 Kernel boot arguments (generic UIO)
 
-Acesse:
+Go to:
 
 **PetaLinux System Configuration → DT Settings → Kernel Bootargs → Add extra boot args**
 
-Adicione um driver de kernel **Generic UIO (Userspace I/O)** à imagem, para permitir acesso aos periféricos da PL a partir do userspace:
+Add a **Generic UIO (Userspace I/O)** kernel driver to the image, to allow access to the PL peripherals from userspace:
 
 <p align="center">
-<img title="Menu de argumentos extras de boot" alt="Menu de configuração de Kernel Bootargs" src="../images/passo23.png" width="100%" height="100%">
+<img title="Extra boot arguments menu" alt="Kernel Bootargs configuration menu" src="../images/passo23.png" width="100%" height="100%">
 </p>
 
 <p align="center">
-<img title="Campo de argumentos extras de boot" alt="Campo de texto para adicionar argumentos extras de boot" src="../images/passo24.png" width="100%" height="100%">
+<img title="Extra boot arguments field" alt="Text field for adding extra boot arguments" src="../images/passo24.png" width="100%" height="100%">
 </p>
 
 <p align="center">
-<img title="Edição dos argumentos de boot" alt="Edição do campo de boot args" src="../images/passo25.png" width="100%" height="100%">
+<img title="Editing the boot arguments" alt="Editing the boot args field" src="../images/passo25.png" width="100%" height="100%">
 </p>
 
-Adicione o argumento:
+Add the argument:
 
 ```
 uio_pdrv_genirq.of_id=generic-uio
 ```
 
 <p align="center">
-<img title="Argumento uio_pdrv_genirq adicionado" alt="Campo de boot args com uio_pdrv_genirq.of_id=generic-uio preenchido" src="../images/passo26.png" width="100%" height="100%">
+<img title="uio_pdrv_genirq argument added" alt="Boot args field filled in with uio_pdrv_genirq.of_id=generic-uio" src="../images/passo26.png" width="100%" height="100%">
 </p>
 
-### 5.3 Manter a PL no device tree
+### 5.3 Keep the PL in the device tree
 
-Acesse **PetaLinux System Configuration → DT Settings** e **desmarque** a opção **Remove PL from devicetree**, para que os IPs da lógica programável apareçam no device tree final:
-
-<p align="center">
-<img title="Opção Remove PL from devicetree" alt="Menu DT Settings com a opção Remove PL from devicetree" src="../images/passo27.png" width="100%" height="100%">
-</p>
+Go to **PetaLinux System Configuration → DT Settings** and **untick** the **Remove PL from devicetree** option, so that the programmable logic IPs appear in the final device tree:
 
 <p align="center">
-<img title="Opção Remove PL from devicetree desmarcada" alt="Opção Remove PL from devicetree desmarcada" src="../images/passo28.png" width="100%" height="100%">
-</p>
-
-### 5.4 Empacotamento de imagem
-
-Acesse **PetaLinux System Configuration → Image Packaging Configuration** e **desmarque** a opção **Copy final images to tftpboot** (a menos que você use boot via TFTP):
-
-<p align="center">
-<img title="Opção Copy final images to tftpboot" alt="Menu Image Packaging Configuration com a opção tftpboot desmarcada" src="../images/passo30.png" width="100%" height="100%">
-</p>
-
-Salve as configurações e saia do menu **PetaLinux System Configuration**:
-
-<p align="center">
-<img title="Salvando as configurações do menu" alt="Tela de confirmação para salvar as configurações" src="../images/passo31.png" width="100%" height="100%">
+<img title="Remove PL from devicetree option" alt="DT Settings menu with the Remove PL from devicetree option" src="../images/passo27.png" width="100%" height="100%">
 </p>
 
 <p align="center">
-<img title="Saindo do menu de configuração" alt="Terminal após sair do menu de configuração do PetaLinux" src="../images/passo32.png" width="100%" height="100%">
+<img title="Remove PL from devicetree option unticked" alt="Remove PL from devicetree option unticked" src="../images/passo28.png" width="100%" height="100%">
 </p>
 
-### 5.5 Sincronizar o device tree da PL
+### 5.4 Image packaging
 
-A partir do diretório do projeto (`/home/xmen/workspace/xilinx-zcu106-2025.2/`), abra os dois arquivos abaixo e copie o conteúdo de `pl.dtsi` para dentro de `system-user.dtsi`:
+Go to **PetaLinux System Configuration → Image Packaging Configuration** and **untick** the **Copy final images to tftpboot** option (unless you boot over TFTP):
+
+<p align="center">
+<img title="Copy final images to tftpboot option" alt="Image Packaging Configuration menu with the tftpboot option unticked" src="../images/passo30.png" width="100%" height="100%">
+</p>
+
+Save the settings and leave the **PetaLinux System Configuration** menu:
+
+<p align="center">
+<img title="Saving the menu settings" alt="Confirmation screen for saving the settings" src="../images/passo31.png" width="100%" height="100%">
+</p>
+
+<p align="center">
+<img title="Leaving the configuration menu" alt="Terminal after leaving the PetaLinux configuration menu" src="../images/passo32.png" width="100%" height="100%">
+</p>
+
+### 5.5 Synchronize the PL device tree
+
+From the project directory (`/home/xmen/workspace/xilinx-zcu106-2025.2/`), open the two files below and copy the contents of `pl.dtsi` into `system-user.dtsi`:
 
 ```bash
 code ../sdt_outdir/pl.dtsi
 code project-spec/meta-user/recipes-bsp/device-tree/files/system-user.dtsi
 ```
 
-> **Nota:** Detalhes em Vitis-Tutorial [02 Edge IA ZCU104](https://xilinx.github.io/Vitis-Tutorials/2021-1/build/html/docs/Vitis_Platform_Creation/Introduction/02-Edge-AI-ZCU104/step2.html).
-> **Nota:** Detalhes em GPIO PetaLinux [GPIO PetaLinux Part 2](https://www.linkedin.com/pulse/gpio-petalinux-part-2-roy-messinger/).
+> **Note:** details in the Vitis Tutorial [02 Edge AI ZCU104](https://xilinx.github.io/Vitis-Tutorials/2021-1/build/html/docs/Vitis_Platform_Creation/Introduction/02-Edge-AI-ZCU104/step2.html).
+> **Note:** details in GPIO PetaLinux [GPIO PetaLinux Part 2](https://www.linkedin.com/pulse/gpio-petalinux-part-2-roy-messinger/).
 
 <p align="center">
-<img title="Copiando pl.dtsi para system-user.dtsi" alt="VS Code com os arquivos pl.dtsi e system-user.dtsi lado a lado" src="../images/passo33.png" width="100%" height="100%">
+<img title="Copying pl.dtsi into system-user.dtsi" alt="VS Code with pl.dtsi and system-user.dtsi side by side" src="../images/passo33.png" width="100%" height="100%">
 </p>
 
-Na linha correspondente ao nó `uio`, altere a propriedade `compatible` para:
+On the line corresponding to the `uio` node, change the `compatible` property to:
 
 ```
 compatible = "generic-uio";
 ```
 
-Salve e feche o VS Code:
+Save and close VS Code:
 
 <p align="center">
-<img title="Alterando a propriedade compatible" alt="Linha compatible = generic-uio editada no system-user.dtsi" src="../images/passo34.png" width="100%" height="100%">
+<img title="Changing the compatible property" alt="compatible = generic-uio line edited in system-user.dtsi" src="../images/passo34.png" width="100%" height="100%">
 </p>
 
 <p align="center">
-<img title="Arquivo system-user.dtsi salvo" alt="Arquivo salvo no VS Code" src="../images/passo36.png" width="100%" height="100%">
+<img title="system-user.dtsi file saved" alt="File saved in VS Code" src="../images/passo36.png" width="100%" height="100%">
 </p>
 
 <p align="center">
-<img title="Terminal após edição do device tree" alt="Terminal de volta após fechar o editor" src="../images/passo38.png" width="100%" height="100%">
+<img title="Terminal after editing the device tree" alt="Back at the terminal after closing the editor" src="../images/passo38.png" width="100%" height="100%">
 </p>
 
-## 6. Configurar o RootFS
+## 6. Configuring the RootFS
 
 ```bash
 petalinux-config -c rootfs
 ```
 
-> **Dica:** use `/` para pesquisar as opções a serem habilitadas e selecione o item com a barra de espaço (tecla numérica) do teclado.
+> **Tip:** use `/` to search for the options you want to enable and select the item with the keyboard's space bar.
 
-### Habilite os seguintes itens no rootfs
+### Enable the following items in the rootfs
 
-| Item | Categoria | Prioridade |
+| Item | Category | Priority |
 |---|---|---|
-| `libstdc++` | libs | Obrigatório |
-| `kmod` | misc | Obrigatório |
-| `udev` | base | Obrigatório |
-| `libgpiod` | libs | Necessário (GPIO) |
-| `gpio-demo` | console → utils | Recomendado |
-| `ssh-server-dropbear` **ou** `ssh-server-openssh` (não os dois) | console → network | Recomendado |
-| `python3-numpy` | devel | Opcional (análise de dados) |
-| `packagegroup-core-buildessential` | petalinux | Opcional (dev na placa, aumenta o tamanho da imagem) |
-| `util-linux` | base | Necessário (boot via pen drive) |
-| `e2fsprogs` | console → utils | Necessário (boot via pen drive) |
-| `dosfstools` | console → utils | Necessário (boot via pen drive) |
-| `gdb` | console → utils | Necessário (debug — marcar explicitamente) |
-| `packagegroup-core-tools-debug` | petalinux | Opcional (símbolos de debug) |
-| `strace` | console → utils | Opcional (debug) |
-| `sudo` | base | Obrigatório |
+| `libstdc++` | libs | Mandatory |
+| `kmod` | misc | Mandatory |
+| `udev` | base | Mandatory |
+| `libgpiod` | libs | Required (GPIO) |
+| `gpio-demo` | console → utils | Recommended |
+| `ssh-server-dropbear` **or** `ssh-server-openssh` (not both) | console → network | Recommended |
+| `python3-numpy` | devel | Optional (data analysis) |
+| `packagegroup-core-buildessential` | petalinux | Optional (on-board development, increases image size) |
+| `util-linux` | base | Required (boot from USB stick) |
+| `e2fsprogs` | console → utils | Required (boot from USB stick) |
+| `dosfstools` | console → utils | Required (boot from USB stick) |
+| `gdb` | console → utils | Required (debugging — tick it explicitly) |
+| `packagegroup-core-tools-debug` | petalinux | Optional (debug symbols) |
+| `strace` | console → utils | Optional (debugging) |
+| `sudo` | base | Mandatory |
 
-**Observação:** em `gpio-demo`, mantenha as seguintes opções habilitadas:
+**Note:** under `gpio-demo`, keep the following options enabled:
 
 <p align="center">
-<img title="Opções do pacote gpio-demo" alt="Menu de configuração do pacote gpio-demo" src="../images/passo39.png" width="100%" height="100%">
+<img title="gpio-demo package options" alt="Configuration menu of the gpio-demo package" src="../images/passo39.png" width="100%" height="100%">
 </p>
 
 <p align="center">
-<img title="Sub-opções habilitadas em gpio-demo" alt="Sub-opções do gpio-demo marcadas" src="../images/passo40.png" width="100%" height="100%">
+<img title="Sub-options enabled under gpio-demo" alt="gpio-demo sub-options ticked" src="../images/passo40.png" width="100%" height="100%">
 </p>
 
-Salve as configurações e saia do menu **Configuration**:
+Save the settings and leave the **Configuration** menu:
 
 <p align="center">
-<img title="Confirmação das opções do gpio-demo" alt="Tela final de confirmação das opções do gpio-demo" src="../images/passo41.png" width="100%" height="100%">
+<img title="Confirming the gpio-demo options" alt="Final confirmation screen for the gpio-demo options" src="../images/passo41.png" width="100%" height="100%">
 </p>
 
-## 7. Compilar o PetaLinux
+## 7. Building PetaLinux
 
-O build pode levar de alguns minutos a algumas horas, dependendo do hardware do seu computador e da quantidade de threads configurada.
+The build can take anywhere from a few minutes to a few hours, depending on your computer's hardware and the number of threads configured.
 
 ```bash
 petalinux-build
 ```
 
 <p align="center">
-<img title="Início do build do PetaLinux" alt="Terminal com o build do PetaLinux em andamento" src="../images/passo43.png" width="100%" height="100%">
+<img title="Start of the PetaLinux build" alt="Terminal with the PetaLinux build in progress" src="../images/passo43.png" width="100%" height="100%">
 </p>
 
-É comum que a **primeira execução** apresente avisos e erros relacionados a cache do Yocto/BitBake, fazendo o build falhar. Nesse caso, basta executar o comando novamente — o cache já parcialmente construído normalmente resolve o problema na segunda tentativa. Para mais detalhes sobre falhas conhecidas de build, consulte o guia de troubleshooting do PetaLinux/Yocto, por exemplo a seção ["Build failures" da documentação do RPi Camera FMC](https://rpi.camerafmc.com/en/latest/troubleshooting.html) ou a documentação oficial da AMD/Xilinx para a sua versão de ferramentas.
+It is common for the **first run** to produce warnings and errors related to the Yocto/BitBake cache, making the build fail. In that case, simply run the command again — the partially built cache usually resolves the problem on the second attempt. For more details about known build failures, see the PetaLinux/Yocto troubleshooting guide, for example the ["Build failures" section of the RPi Camera FMC documentation](https://rpi.camerafmc.com/en/latest/troubleshooting.html) or AMD/Xilinx's official documentation for your tool version.
 
 <p align="center">
-<img title="Erros de cache na primeira execução do build" alt="Terminal mostrando erros de cache na primeira tentativa de build" src="../images/passo44.png" width="100%" height="100%">
+<img title="Cache errors on the first build run" alt="Terminal showing cache errors on the first build attempt" src="../images/passo44.png" width="100%" height="100%">
 </p>
 
-Execute novamente:
+Run it again:
 
 ```bash
 petalinux-build
 ```
 
 <p align="center">
-<img title="Segunda execução do build" alt="Terminal com a segunda execução do petalinux-build" src="../images/passo45.png" width="100%" height="100%">
+<img title="Second build run" alt="Terminal with the second petalinux-build run" src="../images/passo45.png" width="100%" height="100%">
 </p>
 
-### Compilação bem-sucedida
+### Successful build
 
-Ao final, os artefatos de boot (`BOOT.BIN`, `boot.scr`, `image.ub`/`Image`, `system.dtb`, rootfs) estarão disponíveis em `images/linux/` dentro do projeto, prontos para serem gravados em um cartão SD/pen drive ou usados via TFTP/JTAG.
+At the end, the boot artifacts (`BOOT.BIN`, `boot.scr`, `image.ub`/`Image`, `system.dtb`, rootfs) will be available under `images/linux/` inside the project, ready to be written to an SD card/USB stick or used over TFTP/JTAG.
 
 <p align="center">
-<img title="Build do PetaLinux concluído com sucesso" alt="Terminal mostrando o build do PetaLinux finalizado com sucesso" src="../images/passo46.png" width="100%" height="100%">
+<img title="PetaLinux build completed successfully" alt="Terminal showing the PetaLinux build finishing successfully" src="../images/passo46.png" width="100%" height="100%">
 </p>
 
-## 8. Boot via JTAG / Pen Drive
+## 8. Booting via JTAG / USB stick
 
-A escolha desse método se deu em virtude da restrição imposta de realizar todo o processo remotamente, sem a necessidade de contato físico com a FPGA — ou seja, sem manipular os switches que outros métodos exigiriam. Existe também um método que usa `petalinux-boot jtag --kernel`, mas o sistema resultante fica incompleto e não foi aprofundado neste tutorial.
+This method was chosen because of the constraint of doing the whole process remotely, without any physical contact with the FPGA — that is, without touching the switches that other methods would require. There is also a method that uses `petalinux-boot jtag --kernel`, but the resulting system is incomplete and was not explored further in this tutorial.
 
-### Passo 1 — Copiar os artefatos para o pen drive
+### Step 1 — Copy the artifacts to the USB stick
 
-Copie os artefatos gerados pelo build (neste exemplo, de `/home/xmen/workspace/images/linux`) para o pen drive (neste exemplo, `/run/media/xmen/valmir`):
+Copy the artifacts produced by the build (in this example, from `/home/xmen/workspace/images/linux`) to the USB stick (in this example, `/run/media/xmen/valmir`):
 
 <p align="center">
-<img title="Build do PetaLinux concluído com sucesso" alt="Terminal mostrando o build do PetaLinux finalizado com sucesso, artefatos prontos para copiar" src="../images/passo48.png" width="100%" height="100%">
+<img title="PetaLinux build completed successfully" alt="Terminal showing the PetaLinux build finished successfully, artifacts ready to copy" src="../images/passo48.png" width="100%" height="100%">
 </p>
 
-Crie uma pasta no seu pen drive com o nome que desejar.
+Create a folder on your USB stick with whatever name you like.
 
-Use o comando abaixo para listar os discos disponíveis:
+Use the command below to list the available disks:
 
 ```bash
 df -h
 ```
 
-No exemplo deste tutorial, o pen drive está montado em `/run/media/xmen/valmir`:
+In this tutorial's example, the USB stick is mounted at `/run/media/xmen/valmir`:
 
 ```bash
 cd /run/media/xmen/valmir
 mkdir workspace
 ```
 
-Copie os artefatos `rootfs.cpio.gz.u-boot` e `image.ub` para o pen drive:
+Copy the `rootfs.cpio.gz.u-boot` and `image.ub` artifacts to the USB stick:
 
 ```bash
 cd ~/workspace/xilinx-zcu106-2025.2/images/linux
@@ -778,59 +788,59 @@ cp rootfs.cpio.gz.u-boot image.ub /run/media/xmen/valmir/workspace
 ```
 
 <p align="center">
-<img title="Artefatos copiados para o pen drive" alt="Terminal mostrando a cópia de rootfs.cpio.gz.u-boot e image.ub para o pen drive" src="../images/passo49.png" width="100%" height="100%">
+<img title="Artifacts copied to the USB stick" alt="Terminal showing rootfs.cpio.gz.u-boot and image.ub being copied to the USB stick" src="../images/passo49.png" width="100%" height="100%">
 </p>
 
-### Passo 2 — Conectar o pen drive e abrir o monitor serial
+### Step 2 — Plug in the USB stick and open the serial monitor
 
-Após copiar os arquivos, conecte o pen drive na FPGA.
+Once the files are copied, plug the USB stick into the FPGA.
 
-Inicie o Vitis e vá em **Vitis → Serial Monitor**. Selecione a primeira UART referente ao ZYNQ:
+Start Vitis and go to **Vitis → Serial Monitor**. Select the first UART belonging to the ZYNQ:
 
 <p align="center">
-<img title="Seleção da UART no Vitis" alt="Menu Serial Monitor do Vitis com a UART do ZYNQ sendo selecionada" src="../images/passo50.png" width="100%" height="100%">
+<img title="Selecting the UART in Vitis" alt="Vitis Serial Monitor menu with the ZYNQ UART being selected" src="../images/passo50.png" width="100%" height="100%">
 </p>
 
 <p align="center">
-<img title="Monitor serial conectado" alt="Terminal serial conectado à UART da placa" src="../images/passo51.png" width="100%" height="100%">
+<img title="Serial monitor connected" alt="Serial terminal connected to the board's UART" src="../images/passo51.png" width="100%" height="100%">
 </p>
 
-Carregue o ambiente PetaLinux novamente:
+Load the PetaLinux environment again:
 
 <p align="center">
-<img title="Carregando o ambiente PetaLinux novamente" alt="Terminal executando o source do settings.sh do PetaLinux" src="../images/passo52.png" width="100%" height="100%">
+<img title="Loading the PetaLinux environment again" alt="Terminal running source on the PetaLinux settings.sh" src="../images/passo52.png" width="100%" height="100%">
 </p>
 
-E vá até o diretório do projeto (`/home/xmen/workspace/xilinx-zcu106-2025.2`):
+And go to the project directory (`/home/xmen/workspace/xilinx-zcu106-2025.2`):
 
 <p align="center">
-<img title="Acessando o diretório do projeto" alt="Terminal no diretório do projeto PetaLinux" src="../images/passo53.png" width="100%" height="100%">
+<img title="Entering the project directory" alt="Terminal in the PetaLinux project directory" src="../images/passo53.png" width="100%" height="100%">
 </p>
 
-### Passo 3 — Iniciar o U-Boot via JTAG
+### Step 3 — Start U-Boot over JTAG
 
-Inicie o U-Boot com uma imagem pré-compilada:
+Start U-Boot with a prebuilt image:
 
 ```bash
 petalinux-boot jtag --prebuilt 2
 ```
 
 <p align="center">
-<img title="Boot via JTAG com imagem pré-compilada" alt="Terminal executando petalinux-boot jtag --prebuilt 2" src="../images/passo54.png" width="100%" height="100%">
+<img title="Booting over JTAG with a prebuilt image" alt="Terminal running petalinux-boot jtag --prebuilt 2" src="../images/passo54.png" width="100%" height="100%">
 </p>
 
-### Passo 4 — Carregar os arquivos para a memória RAM
+### Step 4 — Load the files into RAM
 
-No terminal da UART:
+In the UART terminal:
 
 ```
 zynq>
-zynq> fatload usb 0:1 0x10000000 {diretório da pasta do pen drive}/image.ub
+zynq> fatload usb 0:1 0x10000000 {directory of the folder on the USB stick}/image.ub
 ```
 
-> **Obs.:** o dispositivo `usb 0:x` pode variar, e o diretório depende da pasta que você criou no pen drive.
+> **Note:** the `usb 0:x` device may vary, and the directory depends on the folder you created on the USB stick.
 
-Neste exemplo:
+In this example:
 
 ```
 fatload usb 0:1 0x10000000 workspace/image.ub
@@ -838,144 +848,144 @@ fatload usb 0:1 0x20000000 workspace/rootfs.cpio.gz.u-boot
 ```
 
 <p align="center">
-<img title="Carregando os artefatos na memória RAM" alt="Terminal com os comandos fatload carregando image.ub e rootfs na RAM" src="../images/passo55.png" width="100%" height="100%">
+<img title="Loading the artifacts into RAM" alt="Terminal with the fatload commands loading image.ub and the rootfs into RAM" src="../images/passo55.png" width="100%" height="100%">
 </p>
 
-### Passo 5 — Boot pela memória RAM
+### Step 5 — Boot from RAM
 
 ```
 bootm 0x10000000 0x20000000
 ```
 
 <p align="center">
-<img title="Executando o boot pela memória RAM" alt="Terminal executando o comando bootm" src="../images/passo56.png" width="100%" height="100%">
+<img title="Booting from RAM" alt="Terminal running the bootm command" src="../images/passo56.png" width="100%" height="100%">
 </p>
 
-> **Obs.:** por esse método, é esperado que o boot fique travado nesta tela — isso acontece porque ainda falta gravar o bitstream na lógica programável.
+> **Note:** with this method, the boot is expected to hang on this screen — that happens because the bitstream has not been written to the programmable logic yet.
 
 <p align="center">
-<img title="Boot travado por falta do bitstream" alt="Terminal com o boot parado aguardando a programação da lógica programável" src="../images/passo57.png" width="100%" height="100%">
+<img title="Boot stalled for lack of the bitstream" alt="Terminal with the boot stopped, waiting for the programmable logic to be programmed" src="../images/passo57.png" width="100%" height="100%">
 </p>
 
-### Passo 6 — Gravar o bitstream na lógica programável
+### Step 6 — Write the bitstream to the programmable logic
 
-No Vivado, vá em **PROGRAM AND DEBUG → Program Device**, selecione a placa (neste exemplo, `xczu7_0`):
+In Vivado, go to **PROGRAM AND DEBUG → Program Device** and select the board (in this example, `xczu7_0`):
 
 <p align="center">
-<img title="Seleção do dispositivo no Vivado" alt="Menu Program Device do Vivado com o dispositivo xczu7_0 selecionado" src="../images/passo58.png" width="100%" height="100%">
+<img title="Selecting the device in Vivado" alt="Vivado's Program Device menu with the xczu7_0 device selected" src="../images/passo58.png" width="100%" height="100%">
 </p>
 
 **PROGRAM AND DEBUG → Program Device → `xczu7_0` → Program**
 
 <p align="center">
-<img title="Programação do bitstream" alt="Vivado gravando o bitstream no dispositivo xczu7_0" src="../images/passo59.png" width="100%" height="100%">
+<img title="Programming the bitstream" alt="Vivado writing the bitstream to the xczu7_0 device" src="../images/passo59.png" width="100%" height="100%">
 </p>
 
-Após isso, o sistema inicializará:
+After that, the system will boot:
 
 <p align="center">
-<img title="Sistema inicializado com sucesso" alt="Terminal mostrando o Linux embarcado inicializado com sucesso" src="../images/passo60.png" width="100%" height="100%">
+<img title="System booted successfully" alt="Terminal showing the embedded Linux booted successfully" src="../images/passo60.png" width="100%" height="100%">
 </p>
 
-### Passo 7 — Login inicial e acesso via SSH
+### Step 7 — First login and SSH access
 
-Por padrão, o usuário é `petalinux`; a senha é a que você definiu durante o primeiro acesso.
+By default the user is `petalinux`; the password is the one you set on first login.
 
 <p align="center">
-<img title="Prompt de login do PetaLinux" alt="Terminal mostrando o prompt de login do usuário petalinux" src="../images/passo61.png" width="100%" height="100%">
+<img title="PetaLinux login prompt" alt="Terminal showing the petalinux user's login prompt" src="../images/passo61.png" width="100%" height="100%">
 </p>
 
-A essa altura, você já deve ter percebido que, ao usar a UART, os comandos aparecem duplicados. Por isso, recomenda-se a utilização do SSH. Para isso, é preciso conectar a FPGA à rede e descobrir o endereço IP associado:
+By now you have probably noticed that, over the UART, commands appear duplicated. For that reason, SSH is recommended. To use it, you need to connect the FPGA to the network and find out the IP address assigned to it:
 
 ```bash
 ifconfig
 ```
 
-Neste exemplo, o IP obtido foi `192.168.130.31`:
+In this example, the IP obtained was `192.168.130.31`:
 
 <p align="center">
-<img title="Verificando o endereço IP da placa" alt="Terminal mostrando a saída do comando ifconfig com o IP da placa" src="../images/passo62.png" width="100%" height="100%">
+<img title="Checking the board's IP address" alt="Terminal showing the output of ifconfig with the board's IP" src="../images/passo62.png" width="100%" height="100%">
 </p>
 
-Abra um terminal no host e conecte via SSH:
+Open a terminal on the host and connect over SSH:
 
 ```bash
 ssh petalinux@192.168.130.31
 ```
 
 <p align="center">
-<img title="Conectando via SSH" alt="Terminal do host conectando à placa via ssh" src="../images/passo63.png" width="100%" height="100%">
+<img title="Connecting over SSH" alt="Host terminal connecting to the board over ssh" src="../images/passo63.png" width="100%" height="100%">
 </p>
 
-> **Obs.:** use a senha definida anteriormente.
+> **Note:** use the password you set earlier.
 
 <p align="center">
-<img title="Autenticação via SSH" alt="Terminal solicitando a senha do usuário petalinux via SSH" src="../images/passo64.png" width="100%" height="100%">
+<img title="SSH authentication" alt="Terminal asking for the petalinux user's password over SSH" src="../images/passo64.png" width="100%" height="100%">
 </p>
 
-### Passo 8 — Verificar o reconhecimento do UIO
+### Step 8 — Check that UIO is recognized
 
-Checagem do reconhecimento do Generic Userspace I/O (UIO):
+Checking that the Generic Userspace I/O (UIO) is recognized:
 
 ```bash
 cat /sys/class/uio/uio*/name
 ```
 
 <p align="center">
-<img title="Verificação do UIO" alt="Terminal mostrando a saída do cat em /sys/class/uio/uio*/name" src="../images/passo66.png" width="100%" height="100%">
+<img title="UIO check" alt="Terminal showing the output of cat on /sys/class/uio/uio*/name" src="../images/passo66.png" width="100%" height="100%">
 </p>
 
-## 9. Deploy na FPGA
+## 9. Deploying onto the FPGA
 
-Com o sistema no ar e acessível via SSH, o deploy da aplicação segue os passos abaixo:
+With the system up and reachable over SSH, deploying the application follows the steps below:
 
-1. Use `scp` para copiar o `.tar` gerado no container para a FPGA, em `/home/petalinux`.
-2. Extraia o conteúdo do `.tar` e entre como usuário `sudo`:
+1. Use `scp` to copy the `.tar` produced in the container to the FPGA, into `/home/petalinux`.
+2. Extract the contents of the `.tar` and switch to `sudo`:
    ```bash
    sudo -i
    ```
-3. Carregue a biblioteca a partir de `deploy_all_files`:
+3. Load the library from `deploy_all_files`:
    ```bash
    export LD_LIBRARY_PATH=./lib
    ```
-4. Execute o binário:
+4. Run the binary:
    ```bash
    ./bin/ExplorationMultipleReactorsCodesign
    ```
 
-O projeto usado como exemplo está na pasta `examples` e explora a utilização de múltiplos reatores a partir de uma extensão do subconjunto da linguagem Lingua Franca voltada para o *Codesign of Reactor-Oriented Hardware and Software for Cyber-Physical Systems*.
+The project used as an example is in the `examples` folder and explores the use of multiple reactors through an extension of the subset of the Lingua Franca language aimed at the *Codesign of Reactor-Oriented Hardware and Software for Cyber-Physical Systems*.
 
 <p align="center">
-<img title="Deploy do projeto na FPGA" alt="Terminal mostrando o deploy do projeto ExplorationMultipleReactorsCodesign na FPGA" src="../images/passo71.png" width="100%" height="100%">
+<img title="Deploying the project onto the FPGA" alt="Terminal showing the deployment of the ExplorationMultipleReactorsCodesign project onto the FPGA" src="../images/passo71.png" width="100%" height="100%">
 </p>
 
 <p align="center">
-<img title="Execução do binário na FPGA" alt="Terminal mostrando a execução do binário ExplorationMultipleReactorsCodesign" src="../images/passo67.png" width="100%" height="100%">
+<img title="Running the binary on the FPGA" alt="Terminal showing the ExplorationMultipleReactorsCodesign binary running" src="../images/passo67.png" width="100%" height="100%">
 </p>
 
-Caso ocorra um erro de **Bus error (core dumped)**, será necessário programar novamente o bitstream — use os passos descritos na [seção 8](#8-boot-via-jtag--pen-drive).
+If a **Bus error (core dumped)** occurs, the bitstream has to be programmed again — use the steps described in [section 8](#8-booting-via-jtag--usb-stick).
 
 <p align="center">
-<img title="Erro Bus error (core dumped)" alt="Terminal mostrando o erro Bus error (core dumped) na execução do binário" src="../images/passo68.png" width="100%" height="100%">
+<img title="Bus error (core dumped)" alt="Terminal showing the Bus error (core dumped) error while running the binary" src="../images/passo68.png" width="100%" height="100%">
 </p>
 
-Execute novamente:
+Run it again:
 
 <p align="center">
-<img title="Execução bem-sucedida após reprogramar o bitstream" alt="Terminal mostrando a execução bem-sucedida do binário após reprogramar o bitstream" src="../images/passo70.png" width="100%" height="100%">
+<img title="Successful run after reprogramming the bitstream" alt="Terminal showing the binary running successfully after reprogramming the bitstream" src="../images/passo70.png" width="100%" height="100%">
 </p>
 
 ---
 
-> Este tutorial ainda tem margem para melhoria e otimização — contribuições e sugestões são bem-vindas.
+> This tutorial still has room for improvement and optimization — contributions and suggestions are welcome.
 
-## 10. Links Úteis
+## 10. Useful links
 
-- [Tutorial ZCU104](https://www.hackster.io/engrinam0077/zcu104-mpsoc-development-petalinux-2024-2-basic-tutorial-c82b8d)
-- ["Build failures" da documentação do RPi Camera FMC](https://rpi.camerafmc.com/en/latest/troubleshooting.html)
+- [ZCU104 tutorial](https://www.hackster.io/engrinam0077/zcu104-mpsoc-development-petalinux-2024-2-basic-tutorial-c82b8d)
+- ["Build failures" section of the RPi Camera FMC documentation](https://rpi.camerafmc.com/en/latest/troubleshooting.html)
 - [TCL File Mode - Xilinx System-Device-Tree-xlnx](https://github.com/Xilinx/system-device-tree-xlnx/blob/master/README.md).
-- [Fluxo AVNET](https://gitlab.avnet.com/xilinx/example-board-projects/zcu106/vitis-platforms/avnet-sme-zcu106-vitis-platform-workflow-training/-/tree/main/2021.2/avtsme_zcu106_base)
-- [Tutorial ZCU106](https://www.fpgalover.com/index.php/boards/39-zcu106/97-build-petalinux-for-zcu106-ps-and-pl-based-10g-ethernet)
-- [Documentação PetaLinux](https://docs.amd.com/r/en-US/ug1144-petalinux-tools-reference-guide/Introduction)
-- [02 Edge IA ZCU104](https://xilinx.github.io/Vitis-Tutorials/2021-1/build/html/docs/Vitis_Platform_Creation/Introduction/02-Edge-AI-ZCU104/step2.html).
+- [AVNET flow](https://gitlab.avnet.com/xilinx/example-board-projects/zcu106/vitis-platforms/avnet-sme-zcu106-vitis-platform-workflow-training/-/tree/main/2021.2/avtsme_zcu106_base)
+- [ZCU106 tutorial](https://www.fpgalover.com/index.php/boards/39-zcu106/97-build-petalinux-for-zcu106-ps-and-pl-based-10g-ethernet)
+- [PetaLinux documentation](https://docs.amd.com/r/en-US/ug1144-petalinux-tools-reference-guide/Introduction)
+- [02 Edge AI ZCU104](https://xilinx.github.io/Vitis-Tutorials/2021-1/build/html/docs/Vitis_Platform_Creation/Introduction/02-Edge-AI-ZCU104/step2.html).
 - [GPIO PetaLinux Part 2](https://www.linkedin.com/pulse/gpio-petalinux-part-2-roy-messinger/).

@@ -1,47 +1,46 @@
-# patches/ — as correções isoladas
+# patches/ — the fixes in isolation
+Each file here is **exactly** the content that `docker/Dockerfile` injects into the
+compiler tree during the build. They are extracted here so they can be read, reviewed
+and versioned as code, not as a string inside a `RUN cat >`.
 
-Cada arquivo aqui é **exatamente** o conteúdo que `docker/Dockerfile` injeta na árvore do
-compilador durante o build. Estão extraídos para cá para serem lidos, revisados e
-versionados como código, não como string dentro de um `RUN cat >`.
+## Where each one lands
 
-## Onde cada um aterrissa
+Clone root: `/opt/lingua-franca`
+Chisel template prefix: `core/src/main/resources/lib/chisel/reactor-chisel/`
 
-Raiz do clone: `/opt/lingua-franca`
-Prefixo do template Chisel: `core/src/main/resources/lib/chisel/reactor-chisel/`
-
-| Arquivo aqui | Destino no compilador |
+| File here | Destination in the compiler |
 |---|---|
-| `reactor-chisel/Main.scala` | `<prefixo>/src/main/scala/Main.scala` |
-| `fpga-tidbits/axi/AXIPlatformWrapper.scala` | `<prefixo>/fpga-tidbits/src/main/scala/fpgatidbits/platform-wrapper/axi/` |
-| `fpga-tidbits/axi/PYNQZCU104CCWrapper.scala` | idem |
-| `fpga-tidbits/axi/ZCU106Wrapper.scala` | idem (arquivo novo) |
-| `fpga-tidbits/cpp/uiodriver.hpp` | `<prefixo>/fpga-tidbits/src/main/resources/cpp/platform-wrapper-regdriver/` (novo) |
-| `fpga-tidbits/cpp/platform-mpsoc-uio.cpp` | idem (novo) |
-| `fpga-tidbits/patch_PlatformWrapper.py` | edita `<prefixo>/fpga-tidbits/.../platform-wrapper/PlatformWrapper.scala` |
-| `fpga-tidbits/patch_Main_platformMap.py` | edita `<prefixo>/fpga-tidbits/src/main/scala/fpgatidbits/Main.scala` |
-| `compiler-kotlin/patch_CodesignGenerator.py` | edita `core/src/main/kotlin/org/lflang/generator/codesign/CodesignGenerator.kt` |
-| `compiler-kotlin/patch_CodesignSwEmitter.py` | edita `core/src/main/kotlin/org/lflang/generator/codesign/CodesignSwEmitter.kt` |
+| `reactor-chisel/Main.scala` | `<prefix>/src/main/scala/Main.scala` |
+| `fpga-tidbits/axi/AXIPlatformWrapper.scala` | `<prefix>/fpga-tidbits/src/main/scala/fpgatidbits/platform-wrapper/axi/` |
+| `fpga-tidbits/axi/PYNQZCU104CCWrapper.scala` | same as above |
+| `fpga-tidbits/axi/ZCU106Wrapper.scala` | same as above (new file) |
+| `fpga-tidbits/cpp/uiodriver.hpp` | `<prefix>/fpga-tidbits/src/main/resources/cpp/platform-wrapper-regdriver/` (new) |
+| `fpga-tidbits/cpp/platform-mpsoc-uio.cpp` | same as above (new) |
+| `fpga-tidbits/patch_PlatformWrapper.py` | edits `<prefix>/fpga-tidbits/.../platform-wrapper/PlatformWrapper.scala` |
+| `fpga-tidbits/patch_Main_platformMap.py` | edits `<prefix>/fpga-tidbits/src/main/scala/fpgatidbits/Main.scala` |
+| `compiler-kotlin/patch_CodesignGenerator.py` | edits `core/src/main/kotlin/org/lflang/generator/codesign/CodesignGenerator.kt` |
+| `compiler-kotlin/patch_CodesignSwEmitter.py` | edits `core/src/main/kotlin/org/lflang/generator/codesign/CodesignSwEmitter.kt` |
 
-Os `.py` editam por **âncora exata** com `assert content.count(anchor) == 1` — se o
-upstream mudar a linha de referência, o build falha de forma ruidosa em vez de aplicar
-silenciosamente um patch errado.
+The `.py` files edit by **exact anchor** with `assert content.count(anchor) == 1` — if
+upstream changes the reference line, the build fails loudly instead of silently
+applying the wrong patch.
 
-## Por que no template-fonte e não no projeto gerado
+## Why in the source template and not in the generated project
 
-Cada chamada a `lfc arquivo.lf` recopia o template empacotado para `src-gen/reactor-chisel`,
-apagando qualquer edição feita ali. Correção permanente só existe editando o template
-e reempacotando:
+Every call to `lfc file.lf` re-copies the packaged template into
+`src-gen/reactor-chisel`, wiping out any edit made there. A permanent fix only exists
+by editing the template and repackaging:
 
 ```bash
 cd /opt/lingua-franca && ./gradlew installDist
 ```
 
-## Adicionar uma placa nova (o critério de generalização)
+## Adding a new board (the generalization criterion)
 
-1. Copiar `fpga-tidbits/axi/ZCU106Wrapper.scala` → `NovaPlacaWrapper.scala`, trocar
-   `platformName` e `suggestName`.
-2. Duas linhas em `fpgatidbits/Main.scala`: `platformMap` e `fpgaPartMap`.
+1. Copy `fpga-tidbits/axi/ZCU106Wrapper.scala` → `NewBoardWrapper.scala`, changing
+   `platformName` and `suggestName`.
+2. Two lines in `fpgatidbits/Main.scala`: `platformMap` and `fpgaPartMap`.
 3. `./gradlew installDist`.
 
-Nenhuma edição em `mainCodesign` — ele lê `platformMainDriverFile` e
-`platformDriverExtraFlags` da própria instância do wrapper.
+No edit in `mainCodesign` — it reads `platformMainDriverFile` and
+`platformDriverExtraFlags` from the wrapper instance itself.

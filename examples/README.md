@@ -1,13 +1,14 @@
 # examples/
-
-| Arquivo | fpgaBoard | Uso |
+| File | fpgaBoard | Use |
 |---|---|---|
-| `loopback_sim.lf` | `VerilatedTester` | valida a lógica do reactor por simulação — `make compiler PROJETO=examples/loopback_sim.lf ARCH=x86_64` |
-| `smoke4.lf` | `ZCU106` | o mesmo loopback em hardware real; é o Smoke Test 4 do Dockerfile |
-| `ExplorationMultipleReactorsCodesignAccelsOpBasics.lf` | `ZCU106` | três aceleradores encadeados (soma, multiplicação, subtração) na PL + impressão no PS |
+| `loopback_sim.lf` | `VerilatedTester` | validates the reactor logic by simulation — `make compiler PROJECT=examples/loopback_sim.lf ARCH=x86_64` |
+| `smoke4.lf` | `ZCU106` | the same loopback on real hardware; this is the Dockerfile's Smoke Test 4 |
+| `ExplorationMultipleReactorsCodesignAccelsOpBasics.lf` | `ZCU106` | three chained accelerators (addition, multiplication, subtraction) in the PL + printing in the PS |
 
-O par `loopback_sim.lf` / `smoke4.lf` existe para mostrar que **só a linha `fpgaBoard` muda**
-entre simular e ir para a placa — o resto do código-fonte é idêntico.
+The `loopback_sim.lf` / `smoke4.lf` pair exists to show that **only the `fpgaBoard`
+line changes** between simulating and going to the board — the rest of the source code
+is identical.
 
-Antes de qualquer síntese no Vivado, declare `clock-period` com o período real do clock
-que alimenta o wrapper no Block Design (ex.: `clock-period: 10 nsec` = 100 MHz).
+Before any synthesis in Vivado, declare `clock-period` with the real period of the
+clock that feeds the wrapper in the Block Design (e.g. `clock-period: 10 nsec` =
+100 MHz).
