@@ -20,15 +20,15 @@
 #define LF_FPGA_UIO_MAP_SIZE 0x10000
 #endif
 
-// Diretório base do sysfs para dispositivos UIO. Configurável via -D para
-// permitir testes com uma árvore de diretório falsa, sem precisar de
-// acesso root a /sys/class/uio real.
+// Base sysfs directory for UIO devices. Configurable via -D so that tests
+// can point the driver at a fake directory tree, without needing root
+// access to the real /sys/class/uio.
 #ifndef LF_FPGA_UIO_SYSFS_DIR
 #define LF_FPGA_UIO_SYSFS_DIR "/sys/class/uio"
 #endif
 
-// Diretório base para os device nodes (/dev/uioN). Configurável pelo mesmo
-// motivo do acima.
+// Base directory for the device nodes (/dev/uioN). Configurable for the
+// same reason as above.
 #ifndef LF_FPGA_UIO_DEV_DIR
 #define LF_FPGA_UIO_DEV_DIR "/dev"
 #endif
@@ -77,7 +77,7 @@ public:
   virtual void attach(const char *name) { (void)name; }
   virtual void detach() {}
 
-  // Exposta para testes: mesma lógica de busca usada no construtor.
+  // Exposed for testing: the same lookup logic used by the constructor.
   static std::string findUioDevice(const std::string &nameHint) {
     const char *sysDir = LF_FPGA_UIO_SYSFS_DIR;
     DIR *dir = opendir(sysDir);

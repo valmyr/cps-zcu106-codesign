@@ -1,6 +1,6 @@
-// Loopback mínimo em modo SIMULAÇÃO (Verilator).
-// Mesmo código-fonte do loopback de FPGA: só muda a linha fpgaBoard.
-// Uso:  make compiler PROJETO=examples/loopback_sim.lf ARCH=x86_64
+// Minimal loopback in SIMULATION mode (Verilator).
+// Same source code as the FPGA loopback: only the fpgaBoard line differs.
+// Usage:  make compiler PROJECT=examples/loopback_sim.lf ARCH=x86_64
 target Codesign {
   fpgaBoard: VerilatedTester
 }

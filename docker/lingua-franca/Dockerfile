@@ -6,7 +6,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Etc/UTC
 
 ###############################################################################
-# Dependências
+# Dependencies
 ###############################################################################
 
 RUN apt-get update && apt-get install -y \
@@ -42,7 +42,7 @@ RUN apt-get update && apt-get install -y \
 
 
 ###############################################################################
-# Instala SBT
+# Install SBT
 ###############################################################################
 
 RUN mkdir -p /etc/apt/keyrings && \
@@ -62,7 +62,7 @@ ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
 ENV PATH=$JAVA_HOME/bin:$PATH
 
 ###############################################################################
-# Configuração do Git
+# Git configuration
 ###############################################################################
 
 RUN git config --global url."https://github.com/".insteadOf git@github.com:
@@ -84,7 +84,7 @@ RUN git clone \
 WORKDIR /opt/lingua-franca
 
 ###############################################################################
-# Corrige .gitmodules
+# Fix .gitmodules
 ###############################################################################
 
 RUN sed -i \
@@ -92,7 +92,7 @@ RUN sed -i \
 .gitmodules
 
 ###############################################################################
-# Atualiza submódulos
+# Update submodules
 ###############################################################################
 
 RUN git submodule sync --recursive
@@ -100,7 +100,7 @@ RUN git submodule sync --recursive
 RUN git submodule update --init --recursive
 
 ###############################################################################
-# Atualiza Scala
+# Update Scala
 ###############################################################################
 
 RUN find . \
@@ -109,28 +109,28 @@ RUN find . \
 
 
 ###############################################################################
-# Atualiza Chisel / ChiselTest
+# Update Chisel / ChiselTest
 #
-# O repo declara chisel3/chiseltest em 4 lugares diferentes, cada um com uma
-# patch-version de partida diferente:
+# The repo declares chisel3/chiseltest in 4 different places, each one
+# starting from a different patch version:
 #   - ChiselSbtGenerator.kt              -> chisel3 3.5.3 / chiseltest 0.5.1
 #   - reactor-chisel/build.sbt           -> chisel3 3.5.3 / chiseltest 0.5.1
 #   - reactor-chisel/build.sc (Mill)     -> chisel3 3.5.1 / chiseltest 0.5.1
-#   - fpga-tidbits/build.sbt (submódulo) -> chisel3 3.5.6 / chiseltest 0.5.6
+#   - fpga-tidbits/build.sbt (submodule) -> chisel3 3.5.6 / chiseltest 0.5.6
 #
-# A versão original deste Dockerfile trocava só valores exatos (3.5.3->3.6.0,
-# 0.5.1->0.6.0, e depois 3.5.6->3.6.0 só para o chisel3), mas nunca migrava o
-# "chiseltest 0.5.6" do fpga-tidbits/build.sbt. Resultado: fpgatidbits passava
-# a depender de chisel3 3.6.0 enquanto chiseltest ficava preso em 0.5.6 (que
-# por sua vez exige chisel3 3.5.6) — exatamente o conflito binário que o sbt
-# reporta ao gerar o hardware ("chisel3_2.13:3.6.0 ... is selected over 3.5.6
-# for test" / "chiseltest_2.13:0.5.6 (depends on 3.5.6)"), o que faz o `sbt
-# run` falhar e, em cascata, a build do software falhar por falta de
-# platform.h / lfFPGA.a (nunca chegam a ser gerados).
+# The original version of this Dockerfile replaced exact values only
+# (3.5.3->3.6.0, 0.5.1->0.6.0, and later 3.5.6->3.6.0 for chisel3 alone), but
+# never migrated the "chiseltest 0.5.6" in fpga-tidbits/build.sbt. The result:
+# fpgatidbits started depending on chisel3 3.6.0 while chiseltest stayed stuck
+# at 0.5.6 (which in turn requires chisel3 3.5.6) — exactly the binary
+# conflict sbt reports when generating the hardware ("chisel3_2.13:3.6.0 ...
+# is selected over 3.5.6 for test" / "chiseltest_2.13:0.5.6 (depends on
+# 3.5.6)"), which makes `sbt run` fail and, in cascade, makes the software
+# build fail for lack of platform.h / lfFPGA.a (they are never generated).
 #
-# Usar uma regex de patch-version (3\.5\.[0-9]+ / 0\.5\.[0-9]+) em vez de
-# valores exatos garante que TODOS os arquivos fiquem na mesma dupla
-# compatível, por linha oficial do Chisel: chisel3 3.6.x <-> chiseltest 0.6.x
+# Using a patch-version regex (3\.5\.[0-9]+ / 0\.5\.[0-9]+) instead of exact
+# values guarantees that ALL files end up on the same compatible pair, as per
+# the official Chisel line: chisel3 3.6.x <-> chiseltest 0.6.x
 # (https://www.chisel-lang.org/docs/appendix/versioning).
 ###############################################################################
 
@@ -139,7 +139,7 @@ RUN find . \
 -exec sed -i -E 's/3\.5\.[0-9]+/3.6.0/g; s/0\.5\.[0-9]+/0.6.0/g' {} \;
 
 ###############################################################################
-# Corrige PlatformWrapper.scala
+# Fix PlatformWrapper.scala
 ###############################################################################
 
 RUN sed -i \
@@ -147,23 +147,23 @@ RUN sed -i \
 core/src/main/resources/lib/chisel/reactor-chisel/fpga-tidbits/src/main/scala/fpgatidbits/platform-wrapper/PlatformWrapper.scala
 
 ###############################################################################
-# Corrige AXIPlatformWrapper.scala
+# Fix AXIPlatformWrapper.scala
 #
-# O build falha na elaboração do hardware com o erro:
+# The build fails during hardware elaboration with the error:
 #   "Attempted to name ZedBoardWrapper.csr: IO[AXILiteExternalIF] with a
 #    duplicated name 'csr'. Use suggestName to seed a unique name"
 #
-# Isso acontece porque o Wire interno usado para a lógica do regfile é
-# declarado como "val csr = Wire(...)" -- mesmo nome do IO externo
-# "csr" (extCsrIf.suggestName("csr")). Quando a subclasse concreta do
-# wrapper (ex.: ZedBoardWrapper) também acaba expondo/observando esse
-# nome, o Chisel detecta a colisão e a elaboração falha.
+# This happens because the internal Wire used for the regfile logic is
+# declared as "val csr = Wire(...)" -- the same name as the external IO
+# "csr" (extCsrIf.suggestName("csr")). When the concrete wrapper subclass
+# (e.g. ZedBoardWrapper) also ends up exposing/observing that name,
+# Chisel detects the collision and elaboration fails.
 #
-# A correção renomeia o Wire interno de "csr" para "csrSlave" (mantendo
-# o IO externo com o nome "csr"), eliminando a colisão. De brinde, troca
-# também o uso de "FPGAQueue(...) <> mem(i).writeData" por uma instância
-# explícita de Module(new FPGAQueue(...)), evitando ambiguidade na
-# geração da fila de write data.
+# The fix renames the internal Wire from "csr" to "csrSlave" (keeping the
+# external IO named "csr"), removing the collision. As a bonus, it also
+# replaces the use of "FPGAQueue(...) <> mem(i).writeData" with an
+# explicit Module(new FPGAQueue(...)) instance, avoiding ambiguity in the
+# generation of the write data queue.
 ###############################################################################
 
 RUN cat > core/src/main/resources/lib/chisel/reactor-chisel/fpga-tidbits/src/main/scala/fpgatidbits/platform-wrapper/axi/AXIPlatformWrapper.scala <<'EOF'
@@ -345,12 +345,12 @@ abstract class AXIPlatformWrapper(p: PlatformWrapperParams,
 EOF
 
 ###############################################################################
-# FASE 3 — PlatformWrapper.scala: campos genéricos de driver
+# PHASE 3 — PlatformWrapper.scala: generic driver fields
 #
-# Adiciona platformMainDriverFile / platformDriverExtraFlags à classe base,
-# com valores default seguros (não quebram os ~10 wrappers pré-existentes
-# que não os sobrescrevem). Isso é o que permite ao mainCodesign (abaixo)
-# compilar o driver certo, com as flags certas, sem hardcode por placa.
+# Adds platformMainDriverFile / platformDriverExtraFlags to the base class,
+# with safe default values (they do not break the ~10 pre-existing wrappers
+# that do not override them). This is what lets mainCodesign (below) compile
+# the right driver, with the right flags, without any per-board hardcoding.
 ###############################################################################
 
 RUN python3 << 'PYEOF'
@@ -361,13 +361,13 @@ with open(path) as f:
 anchor = '  def platformDriverFiles: Seq[String]  // additional files'
 patch = anchor + '''
 
-  // Nome do .cpp que contém initPlatform/deinitPlatform, dentro de
-  // platformDriverFiles. Por padrão, deduzido automaticamente: o primeiro
-  // .cpp da lista.
+  // Name of the .cpp file inside platformDriverFiles that contains
+  // initPlatform/deinitPlatform. By default it is inferred automatically:
+  // the first .cpp in the list.
   def platformMainDriverFile: String = platformDriverFiles.find(_.endsWith(".cpp")).getOrElse("")
 
-  // Flags extras de compilação para platformMainDriverFile (ex: "-fpermissive"
-  // para drivers legados de 32 bits). Vazio por padrão.
+  // Extra compilation flags for platformMainDriverFile (e.g. "-fpermissive"
+  // for legacy 32-bit drivers). Empty by default.
   def platformDriverExtraFlags: Seq[String] = Seq()'''
 assert content.count(anchor) == 1, 'anchor not found exactly once'
 content = content.replace(anchor, patch, 1)
@@ -376,14 +376,15 @@ with open(path, 'w') as f:
 print('PlatformWrapper.scala patched OK')
 PYEOF
 ###############################################################################
-# reactor-chisel/src/main/scala/Main.scala — mainCodesign genérico
+# reactor-chisel/src/main/scala/Main.scala — generic mainCodesign
 #
-# Substitui o Main.scala do orquestrador Chisel: o ramo "else" (qualquer
-# plataforma que não seja VerilatedTester) agora lê platformMainDriverFile /
-# platformDriverExtraFlags da própria instância do wrapper, em vez de ter o
-# nome do driver hardcoded. A instância é criada UMA vez, dentro do bloco
-# passado por nome ao emitVerilog (necessário: instanciar um Module fora do
-# contexto do Chisel Builder falha com "must be inside Builder context").
+# Replaces the Main.scala of the Chisel orchestrator: the "else" branch (any
+# platform other than VerilatedTester) now reads platformMainDriverFile /
+# platformDriverExtraFlags from the wrapper instance itself, instead of having
+# the driver name hardcoded. The instance is created ONCE, inside the
+# by-name block passed to emitVerilog (required: instantiating a Module
+# outside the Chisel Builder context fails with "must be inside Builder
+# context").
 ###############################################################################
 
 RUN cat > core/src/main/resources/lib/chisel/reactor-chisel/src/main/scala/Main.scala <<'EOF'
@@ -495,14 +496,14 @@ object Settings {
 EOF
 
 ###############################################################################
-# PYNQZCU104CCWrapper.scala — copia de fato os arquivos de driver
+# PYNQZCU104CCWrapper.scala — actually copies the driver files
 #
-# O wrapper original só DEFINIA platformDriverFiles, nunca chamava
-# resourceCopyBulk/generateRegDriver — por isso build/ nunca continha
-# platform.h/CodesignTopReactor.hpp/driver para essa plataforma. Também
-# sobrescreve platformDriverExtraFlags com "-fpermissive", necessário
-# porque linuxphysregdriver.hpp foi escrito para ARM 32 bits (cast de
-# void* para unsigned int) e GCC rejeita isso por padrão em ARM64.
+# The original wrapper only DEFINED platformDriverFiles, it never called
+# resourceCopyBulk/generateRegDriver — which is why build/ never contained
+# platform.h/CodesignTopReactor.hpp/the driver for this platform. It also
+# overrides platformDriverExtraFlags with "-fpermissive", required because
+# linuxphysregdriver.hpp was written for 32-bit ARM (it casts void* to
+# unsigned int) and GCC rejects that by default on ARM64.
 ###############################################################################
 
 RUN cat > core/src/main/resources/lib/chisel/reactor-chisel/fpga-tidbits/src/main/scala/fpgatidbits/platform-wrapper/axi/PYNQZCU104CCWrapper.scala <<'EOF'
@@ -539,9 +540,9 @@ class PYNQZCU104CCWrapper(instFxn: PlatformWrapperParams => GenericAccelerator, 
 EOF
 
 ###############################################################################
-# ZCU106Wrapper.scala — wrapper próprio (mesmo chip do PYNQZCU104CC, mas
-# identidade clara para manutenção futura). Usa o driver canônico de 64
-# bits (UioDriver / platform-mpsoc-uio.cpp), sem necessidade de flags.
+# ZCU106Wrapper.scala — dedicated wrapper (same chip as PYNQZCU104CC, but
+# with a clear identity for future maintenance). Uses the canonical 64-bit
+# driver (UioDriver / platform-mpsoc-uio.cpp), with no flags needed.
 ###############################################################################
 
 RUN cat > core/src/main/resources/lib/chisel/reactor-chisel/fpga-tidbits/src/main/scala/fpgatidbits/platform-wrapper/axi/ZCU106Wrapper.scala <<'EOF'
@@ -577,11 +578,11 @@ class ZCU106Wrapper(instFxn: PlatformWrapperParams => GenericAccelerator, target
 EOF
 
 ###############################################################################
-# uiodriver.hpp / platform-mpsoc-uio.cpp — driver canônico de 64 bits,
-# via UIO (/dev/uioN + mmap), sem depender de xlnk (ausente em kernels
-# linux-xlnx modernos). Diretórios/nomes de dispositivo configuráveis por
-# macro, com defaults de produção (/sys/class/uio, /dev) — permite testar
-# a lógica isoladamente (ver test_uiodriver.cpp) sem afetar produção.
+# uiodriver.hpp / platform-mpsoc-uio.cpp — canonical 64-bit driver, via
+# UIO (/dev/uioN + mmap), with no dependency on xlnk (absent from modern
+# linux-xlnx kernels). Device directories/names are configurable by macro,
+# with production defaults (/sys/class/uio, /dev) — this allows testing the
+# logic in isolation (see test_uiodriver.cpp) without affecting production.
 ###############################################################################
 
 RUN cat > core/src/main/resources/lib/chisel/reactor-chisel/fpga-tidbits/src/main/resources/cpp/platform-wrapper-regdriver/uiodriver.hpp <<'EOF'
@@ -607,15 +608,15 @@ RUN cat > core/src/main/resources/lib/chisel/reactor-chisel/fpga-tidbits/src/mai
 #define LF_FPGA_UIO_MAP_SIZE 0x10000
 #endif
 
-// Diretório base do sysfs para dispositivos UIO. Configurável via -D para
-// permitir testes com uma árvore de diretório falsa, sem precisar de
-// acesso root a /sys/class/uio real.
+// Base sysfs directory for UIO devices. Configurable via -D so that tests
+// can point the driver at a fake directory tree, without needing root
+// access to the real /sys/class/uio.
 #ifndef LF_FPGA_UIO_SYSFS_DIR
 #define LF_FPGA_UIO_SYSFS_DIR "/sys/class/uio"
 #endif
 
-// Diretório base para os device nodes (/dev/uioN). Configurável pelo mesmo
-// motivo do acima.
+// Base directory for the device nodes (/dev/uioN). Configurable for the
+// same reason as above.
 #ifndef LF_FPGA_UIO_DEV_DIR
 #define LF_FPGA_UIO_DEV_DIR "/dev"
 #endif
@@ -664,7 +665,7 @@ public:
   virtual void attach(const char *name) { (void)name; }
   virtual void detach() {}
 
-  // Exposta para testes: mesma lógica de busca usada no construtor.
+  // Exposed for testing: the same lookup logic used by the constructor.
   static std::string findUioDevice(const std::string &nameHint) {
     const char *sysDir = LF_FPGA_UIO_SYSFS_DIR;
     DIR *dir = opendir(sysDir);
@@ -709,11 +710,11 @@ RUN cat > core/src/main/resources/lib/chisel/reactor-chisel/fpga-tidbits/src/mai
 #include "platform.h"
 #include "uiodriver.hpp"
 
-// Hint "ZCU106Wrapper" bate por substring com o nome real do dispositivo
-// exposto em /sys/class/uio/uioN/name pelo sdtgen (ex.: "ZCU106Wrapper@a0000000"),
-// confirmado em bring-up real na placa. O macro LF_FPGA_UIO_NAME por si só
-// ("lf_fpga_regs") nunca bate com o nome que o device tree gerado usa de
-// fato -- por isso o hint precisa ser passado explicitamente aqui.
+// The "ZCU106Wrapper" hint matches, as a substring, the actual device name
+// that sdtgen exposes in /sys/class/uio/uioN/name (e.g. "ZCU106Wrapper@a0000000"),
+// as confirmed during real bring-up on the board. The LF_FPGA_UIO_NAME macro
+// on its own ("lf_fpga_regs") never matches the name the generated device
+// tree actually uses -- hence the hint must be passed explicitly here.
 WrapperRegDriver *initPlatform(bool tracing) {
   (void)tracing;
   return new UioDriver("ZCU106Wrapper");
@@ -726,14 +727,15 @@ void deinitPlatform(WrapperRegDriver *driver) {
 }
 EOF
 ###############################################################################
-# CodesignGenerator.kt — compila o software automaticamente para QUALQUER
-# placa, não só VerilatedTester (simulação).
+# CodesignGenerator.kt — compiles the software automatically for ANY board,
+# not just VerilatedTester (simulation).
 #
-# Original: só compilava o software gerado quando fpgaBoard == "VerilatedTester",
-# exigindo um passo manual extra (lfc --target-compiler ... _SwTop.lf) para
-# qualquer placa real. Esta edição remove essa restrição: swEmitter.compile()
-# roda sempre, usando o --target-compiler passado na linha de comando do lfc
-# (ou o compilador nativo do sistema, se nenhum for especificado).
+# Original: it only compiled the generated software when
+# fpgaBoard == "VerilatedTester", requiring an extra manual step
+# (lfc --target-compiler ... _SwTop.lf) for any real board. This edit removes
+# that restriction: swEmitter.compile() always runs, using the
+# --target-compiler passed on the lfc command line (or the system's native
+# compiler, if none is given).
 ###############################################################################
 
 RUN python3 << 'PYEOF'
@@ -753,11 +755,11 @@ print('CodesignGenerator.kt patched OK')
 PYEOF
 
 ###############################################################################
-# fpgatidbits/Main.scala — registro de ZCU106 no platformMap e fpgaPartMap
+# fpgatidbits/Main.scala — registers ZCU106 in platformMap and fpgaPartMap
 #
-# Edição cirúrgica (não substitui o arquivo inteiro, que tem outras seções
-# não documentadas nesta conversa) via Python, ancorada nas linhas exatas
-# do PYNQZCU104CC já existentes.
+# Surgical edit (it does not replace the whole file, which has other
+# sections not documented here) via Python, anchored on the exact existing
+# PYNQZCU104CC lines.
 ###############################################################################
 
 RUN python3 << 'PYEOF'
@@ -781,16 +783,17 @@ print('fpgatidbits/Main.scala patched OK')
 PYEOF
 
 ###############################################################################
-# CodesignSwEmitter.kt — propaga --target-compiler para o .lf de software
-# gerado internamente.
+# CodesignSwEmitter.kt — propagates --target-compiler to the internally
+# generated software .lf.
 #
-# CodesignSwEmitter.compile() cria um novo MainContext/TargetConfig do zero,
-# usando Properties() vazio como cliArgs -- isso descarta qualquer
-# --target-compiler passado na linha de comando original do lfc. O novo
-# TargetConfig só é reconstruído a partir do que está ESCRITO no arquivo
-# _SwTop.lf gerado (via TargetProperty.COMPILER, keyword "compiler" no .lf).
-# Esta correção faz generateTarget() escrever essa diretiva no .lf gerado,
-# propagando o compilador certo através dessa segunda passada de geração.
+# CodesignSwEmitter.compile() creates a brand-new MainContext/TargetConfig
+# from scratch, using an empty Properties() as cliArgs -- that discards any
+# --target-compiler passed on the original lfc command line. The new
+# TargetConfig is only rebuilt from what is WRITTEN in the generated
+# _SwTop.lf file (via TargetProperty.COMPILER, keyword "compiler" in the
+# .lf). This fix makes generateTarget() write that directive into the
+# generated .lf, propagating the right compiler through that second
+# generation pass.
 ###############################################################################
 
 RUN python3 << 'PYEOF'
@@ -816,16 +819,16 @@ print('CodesignSwEmitter.kt patched OK')
 PYEOF
 
 
-# O mesmo arquivo também existe em core/build/resources/main/... (gerado
-# pelo processamento de resources do gradle a partir do diretório acima).
-# Garante que as duas cópias fiquem idênticas e corrigidas, para o caso de
-# essa pasta já existir de um build anterior / cache reaproveitado.
+# The same file also exists under core/build/resources/main/... (produced by
+# gradle's resource processing from the directory above). This keeps both
+# copies identical and patched, in case that folder already exists from a
+# previous build / reused cache.
 RUN mkdir -p core/build/resources/main/lib/chisel/reactor-chisel/fpga-tidbits/src/main/scala/fpgatidbits/platform-wrapper/axi && \
     cp core/src/main/resources/lib/chisel/reactor-chisel/fpga-tidbits/src/main/scala/fpgatidbits/platform-wrapper/axi/AXIPlatformWrapper.scala \
        core/build/resources/main/lib/chisel/reactor-chisel/fpga-tidbits/src/main/scala/fpgatidbits/platform-wrapper/axi/AXIPlatformWrapper.scala
 
 ###############################################################################
-# Compila
+# Build
 ###############################################################################
 
 RUN chmod +x gradlew
@@ -839,7 +842,7 @@ RUN ./gradlew assemble --no-daemon
 ENV PATH=/opt/lingua-franca/build/install/lf-cli/bin:$PATH
 
 ###############################################################################
-# Testes
+# Tests
 ###############################################################################
 
 RUN java -version
@@ -850,7 +853,7 @@ RUN sbt --version
 
 RUN lfc --help
 ###############################################################################
-# Usuário lingua-franca
+# lingua-franca user
 ###############################################################################
 
 RUN useradd -m -s /bin/bash -G sudo lingua-franca
@@ -860,10 +863,10 @@ RUN echo 'lingua-franca:1234' | chpasswd
 RUN echo 'lingua-franca ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/lingua-franca && \
     chmod 0440 /etc/sudoers.d/lingua-franca
 
-# Dá posse do projeto
+# Hand over ownership of the project
 RUN chown -R lingua-franca:lingua-franca /opt/lingua-franca
 
-# Copia os caches do sbt
+# Copy the sbt caches
 RUN for d in .cache .ivy2 .sbt; do \
       if [ -d "/root/$d" ]; then \
         cp -a "/root/$d" "/home/lingua-franca/$d"; \
@@ -875,7 +878,7 @@ RUN mkdir -p /workspace && \
     chown lingua-franca:lingua-franca /workspace
 
 ###############################################################################
-# Troca para o usuário
+# Switch to the user
 ###############################################################################
 
 USER lingua-franca
@@ -891,13 +894,13 @@ RUN RUNZSH=no \
     KEEP_ZSHRC=yes \
     sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
 ###############################################################################
-# Tema do Oh My Zsh
+# Oh My Zsh theme
 ###############################################################################
 
 RUN sed -i 's/^ZSH_THEME=.*/ZSH_THEME="jonathan"/' ~/.zshrc
 
 ###############################################################################
-# Copia exemplos
+# Copy examples
 ###############################################################################
 
 RUN mkdir -p ~/test && \
@@ -937,80 +940,88 @@ RUN cd /tmp/smoketest4 && \
     echo "SMOKE TEST 4 PASSED - software compiled automatically for ZCU106" && \
     rm -rf /tmp/smoketest4
 
-RUN grep -q 'ZSH_THEME="jonathan"' ~/.zshrc && echo "Tema jonathan configurado com sucesso" || (echo "ERRO: tema nao foi aplicado" && exit 1)
+RUN grep -q 'ZSH_THEME="jonathan"' ~/.zshrc && echo "jonathan theme configured successfully" || (echo "ERROR: theme was not applied" && exit 1)
 
 WORKDIR /home/lingua-franca
 
 RUN cat <<'EOF' > Makefile
-# Makefile para compilar 
-#Caso I deploy em FPGA: make all PROJETO=ExplorationMultipleReactorsCodesignAccelsOpBasics.lf ARCH=arm
-#Caso II simulacao	  : make all PROJETO=ExplorationMultipleReactorsCodesignAccelsOpBasics.lf ARCH=x86_64
-#É necessário especificar a extensão do arquivo; isso é uma escolha arbitrária exclusivamente minha.
-VERMELHO = \033[1;31m
-VERDE    = \033[1;32m
-AMARELO  = \033[1;33m
+# Makefile for compiling
+#Case I  FPGA deploy : make all PROJECT=ExplorationMultipleReactorsCodesignAccelsOpBasics.lf ARCH=arm
+#Case II simulation  : make all PROJECT=ExplorationMultipleReactorsCodesignAccelsOpBasics.lf ARCH=x86_64
+#The file extension must be given explicitly; that is an arbitrary choice of mine alone.
+RED      = \033[1;31m
+GREEN    = \033[1;32m
+YELLOW   = \033[1;33m
 RESET    = \033[0m
-PROJETO  ?= ExplorationMultipleReactorsCodesignAccelsOpBasics.lf
+PROJECT  ?= ExplorationMultipleReactorsCodesignAccelsOpBasics.lf
+# Backwards compatibility: PROJETO was the former name of PROJECT and is
+# still accepted. A PROJECT passed on the command line always wins.
+ifdef PROJETO
+PROJECT := $(PROJETO)
+endif
 ARCH ?= arm
 TIMESTAMP := $(shell date +%Y%m%d_%H%M)
 ifeq ($(ARCH),arm)
     TARGET_COMPILER := aarch64-linux-gnu-g++
-    MODO := deploy
+    MODE := deploy
 else ifeq ($(ARCH),x86_64)
     TARGET_COMPILER := g++
-    MODO := simulacao
+    MODE := simulation
 else
-    $(error ARCH inválido: '$(ARCH)'. Use ARCH=arm ou ARCH=x86_64)
+    $(error invalid ARCH: '$(ARCH)'. Use ARCH=arm or ARCH=x86_64)
 endif
 .PHONY: all compiler deploy clean check-string
 check-string:clean
-	@if [ "$(MODO)" = "simulacao" ]; then \
-		printf "$(VERDE)Modo simulação detectado no arquivo!$(RESET)\n"; \
+	@if [ -n "$(PROJETO)" ]; then \
+		printf "$(YELLOW)WARNING: PROJETO is deprecated, use PROJECT instead.$(RESET)\n"; \
+	fi
+	@if [ "$(MODE)" = "simulation" ]; then \
+		printf "$(GREEN)Simulation mode detected in the file!$(RESET)\n"; \
 		if [ "$(ARCH)" != "x86_64" ]; then \
-			printf "$(VERMELHO)ERRO: arquivo indica modo simulação, mas ARCH=$(ARCH). Use ARCH=x86_64$(RESET)\n"; \
+			printf "$(RED)ERROR: file indicates simulation mode, but ARCH=$(ARCH). Use ARCH=x86_64$(RESET)\n"; \
 			exit 1; \
 		fi; \
 	else \
-		printf "$(VERMELHO)Modo implementação em FPGA detectado!$(RESET)\n"; \
+		printf "$(RED)FPGA implementation mode detected!$(RESET)\n"; \
 		if [ "$(ARCH)" != "arm" ]; then \
-			printf "$(VERMELHO)ERRO: arquivo indica FPGA, mas ARCH=$(ARCH). Use ARCH=arm$(RESET)\n"; \
+			printf "$(RED)ERROR: file indicates FPGA, but ARCH=$(ARCH). Use ARCH=arm$(RESET)\n"; \
 			exit 1; \
 		fi; \
 	fi
 all: deploy
 compiler: check-string
-	@printf "$(VERDE)Compilando Reatores...$(RESET)\n"
-	@printf "$(VERMELHO)lfc --target-compiler=$(TARGET_COMPILER) $(PROJETO)$(RESET)\n"
-	lfc --target-compiler=$(TARGET_COMPILER) $(PROJETO)
-	@printf "$(VERDE)Fim do processo$(RESET)\n"
+	@printf "$(GREEN)Compiling reactors...$(RESET)\n"
+	@printf "$(RED)lfc --target-compiler=$(TARGET_COMPILER) $(PROJECT)$(RESET)\n"
+	lfc --target-compiler=$(TARGET_COMPILER) $(PROJECT)
+	@printf "$(GREEN)End of process$(RESET)\n"
 deploy: compiler
-	@if [ "$(MODO)" = "simulacao" ]; then \
-		printf "$(AMARELO)Modo simulação detectado — deploy (empacotamento) não será executado.$(RESET)\n"; \
+	@if [ "$(MODE)" = "simulation" ]; then \
+		printf "$(YELLOW)Simulation mode detected — deploy (packaging) will not run.$(RESET)\n"; \
 	else \
 		rm -rf ./deploy_all_files; \
 		mkdir -p ./deploy_all_files; \
 		rm -rf ./deploy_all_files/*; \
 		mkdir -p deploy_all_files/bin;\
-		printf "$(VERDE)Encapsulando implementacao Software e Hardware...$(RESET)\n"; \
-		printf "$(VERDE)Copiando arquivos Verilog...$(RESET)\n"; \
-		cp ./codesign-gen/$(basename $(PROJETO))/src-gen/hardware/_FpgaTop/build/ZCU106Wrapper.v ./deploy_all_files ; \
-    cp ./codesign-gen/$(basename $(PROJETO))/src-gen/reactor-chisel/fpga-tidbits/src/main/resources/verilog/Q_srl.v ./deploy_all_files ; \
-		printf "$(VERDE)Copiando arquivos da biblioteca...$(RESET)\n"; \
-		cp -r ./codesign-gen/$(basename $(PROJETO))/lib ./deploy_all_files ; \
-		cp -r ./bin/$(basename $(PROJETO)) ./deploy_all_files/bin/ ; \
-		cp -r ./$(PROJETO) ./deploy_all_files/$(basename $(PROJETO))_SNAPSHOT_$(TIMESTAMP).lf ; \
-		printf "$(VERDE)Compactando...$(RESET)\n"; \
-		tar -czf ./$(basename $(PROJETO))_$(TIMESTAMP)_deploy.tar.gz \
+		printf "$(GREEN)Packaging software and hardware implementation...$(RESET)\n"; \
+		printf "$(GREEN)Copying Verilog files...$(RESET)\n"; \
+		cp ./codesign-gen/$(basename $(PROJECT))/src-gen/hardware/_FpgaTop/build/ZCU106Wrapper.v ./deploy_all_files ; \
+    cp ./codesign-gen/$(basename $(PROJECT))/src-gen/reactor-chisel/fpga-tidbits/src/main/resources/verilog/Q_srl.v ./deploy_all_files ; \
+		printf "$(GREEN)Copying library files...$(RESET)\n"; \
+		cp -r ./codesign-gen/$(basename $(PROJECT))/lib ./deploy_all_files ; \
+		cp -r ./bin/$(basename $(PROJECT)) ./deploy_all_files/bin/ ; \
+		cp -r ./$(PROJECT) ./deploy_all_files/$(basename $(PROJECT))_SNAPSHOT_$(TIMESTAMP).lf ; \
+		printf "$(GREEN)Compressing...$(RESET)\n"; \
+		tar -czf ./$(basename $(PROJECT))_$(TIMESTAMP)_deploy.tar.gz \
 			./deploy_all_files/ZCU106Wrapper.v \
       ./deploy_all_files/Q_srl.v \
 			./deploy_all_files/lib \
-			./deploy_all_files/bin/$(basename $(PROJETO)) \
-			./deploy_all_files/$(basename $(PROJETO))_SNAPSHOT_$(TIMESTAMP).lf; \
-		printf "$(VERMELHO)Fim do encapsulamento$(RESET)\n"; \
+			./deploy_all_files/bin/$(basename $(PROJECT)) \
+			./deploy_all_files/$(basename $(PROJECT))_SNAPSHOT_$(TIMESTAMP).lf; \
+		printf "$(RED)End of packaging$(RESET)\n"; \
 	fi
 clean:
-	@printf "$(VERDE)Limpando artefatos...$(RESET)\n"
-	@printf "$(VERMELHO)rm -rf codesign-gen$(RESET)\n"
+	@printf "$(GREEN)Cleaning artifacts...$(RESET)\n"
+	@printf "$(RED)rm -rf codesign-gen$(RESET)\n"
 	rm -rf codesign-gen
 EOF
 

@@ -5,13 +5,13 @@ with open(path) as f:
 anchor = '  def platformDriverFiles: Seq[String]  // additional files'
 patch = anchor + '''
 
-  // Nome do .cpp que contém initPlatform/deinitPlatform, dentro de
-  // platformDriverFiles. Por padrão, deduzido automaticamente: o primeiro
-  // .cpp da lista.
+  // Name of the .cpp file inside platformDriverFiles that contains
+  // initPlatform/deinitPlatform. By default it is inferred automatically:
+  // the first .cpp in the list.
   def platformMainDriverFile: String = platformDriverFiles.find(_.endsWith(".cpp")).getOrElse("")
 
-  // Flags extras de compilação para platformMainDriverFile (ex: "-fpermissive"
-  // para drivers legados de 32 bits). Vazio por padrão.
+  // Extra compilation flags for platformMainDriverFile (e.g. "-fpermissive"
+  // for legacy 32-bit drivers). Empty by default.
   def platformDriverExtraFlags: Seq[String] = Seq()'''
 assert content.count(anchor) == 1, 'anchor not found exactly once'
 content = content.replace(anchor, patch, 1)
