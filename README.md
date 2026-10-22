@@ -1,7 +1,20 @@
-# Codesign Lingua Franca: portabilidade para a FPGA ZCU106
+# Lingua Franca em FPGA
 
-> Suporte nativo à placa **Xilinx ZCU106** no compilador Lingua Franca (fork `erlingrj/lingua-franca`, branch `chisel3`, target `Codesign`), empacotado em uma imagem Docker reprodutível, do `.lf` ao binário ARM64 rodando sobre PetaLinux.
+> Hardware e software descritos no mesmo nível de abstração:
+> reatores com concorrência determinística, de um lado e do outro
+> da fronteira PL/PS de um Zynq UltraScale+.
 
+Suporte nativo à placa **Xilinx ZCU106** no compilador Lingua Franca
+(fork `erlingrj/lingua-franca`, branch `chisel3`, target `Codesign`).
+Um único `.lf` descreve *hardware reactors*, sintetizados via
+`reactor-chisel` para a lógica programável, e reatores de software,
+compilados em C++ para o processador — um comando gera, cross-compila
+e empacota os dois.
+
+Baseado em *Codesign of Reactor-Oriented Hardware and Software for
+Cyber-Physical Systems* (Jellum, Schoeberl, Lee e Orlandic, ACM TRETS
+17(4), 2024). Este repositório contribui com a portabilidade para a
+ZCU106 e com a automação do fluxo de build.
 ---
 
 ## 1. O que foi feito
@@ -172,7 +185,7 @@ file codesign-gen/smoke4/bin/_SwTop        # ELF 64-bit … ARM aarch64
 
 Requisitos: ≥15 GB de disco e ≥8 GB de RAM para o `docker build`.
 
-O container roda como `lingua-franca` (senha `1234`), com `WORKDIR` em `/home/lingua-franca`, onde já estão o `Makefile` e um `.lf` de exemplo. A primeira compilação Codesign de cada container baixa as dependências do `sbt` e leva alguns minutos. Para detalhes — bind mounts para os artefatos de deploy, acesso SSH, onde ficam os testes do fork — veja [`docs/02-dockerfile-lfc.md`](docs/02-dockerfile-lfc.md).
+O container roda como `lingua-franca` (senha `1234`), com `WORKDIR` em `/home/lingua-franca`, onde já estão o `Makefile` e um `.lf` de exemplo. A primeira compilação Codesign de cada container baixa as dependências do `sbt` e leva alguns minutos. Para detalhes — bind mounts para os artefatos de deploy, acesso SSH, onde ficam os testes do fork — veja [`docs/01-dockerfile-lfc.md`](docs/01-dockerfile-lfc.md).
 
 ### 5.1 Simulação vs. FPGA
 
