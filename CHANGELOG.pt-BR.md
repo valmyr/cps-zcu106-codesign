@@ -2,7 +2,7 @@
 
 > 🇧🇷 **Português** · [🇬🇧 English](CHANGELOG.md) — a versão em inglês é a canônica.
 
-<!-- translated-from: CHANGELOG.md@f800594874f32cb2b225e0293e286872822d3d3e -->
+<!-- translated-from: CHANGELOG.md@0ad06220c587dbc56eca15e4552068f564aec71c -->
 
 Histórico das correções aplicadas à imagem, na ordem em que foram
 introduzidas. Cada entrada referencia o item correspondente no

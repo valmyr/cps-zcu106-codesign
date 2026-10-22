@@ -2,7 +2,7 @@
 
 > 🇧🇷 **Português** · [🇬🇧 English](README.md) — a versão em inglês é a canônica.
 
-<!-- translated-from: patches/README.md@f800594874f32cb2b225e0293e286872822d3d3e -->
+<!-- translated-from: patches/README.md@0ad06220c587dbc56eca15e4552068f564aec71c -->
 
 Cada arquivo aqui é **exatamente** o conteúdo que `docker/Dockerfile` injeta na árvore do
 compilador durante o build. Estão extraídos para cá para serem lidos, revisados e

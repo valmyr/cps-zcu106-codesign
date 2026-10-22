@@ -2,7 +2,7 @@
 
 > 🇧🇷 **Português** · [🇬🇧 English](../01-dockerfile-lfc.md) — a versão em inglês é a canônica.
 
-<!-- translated-from: docs/01-dockerfile-lfc.md@f800594874f32cb2b225e0293e286872822d3d3e -->
+<!-- translated-from: docs/01-dockerfile-lfc.md@0ad06220c587dbc56eca15e4552068f564aec71c -->
 
 > Histórico cronológico de todas as correções aplicadas à imagem: veja
 > [`CHANGELOG.pt-BR.md`](../../CHANGELOG.pt-BR.md).

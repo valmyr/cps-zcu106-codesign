@@ -2,7 +2,7 @@
 
 > 🇧🇷 **Português** · [🇬🇧 English](../03-backlog-generalization.md) — a versão em inglês é a canônica.
 
-<!-- translated-from: docs/03-backlog-generalization.md@f800594874f32cb2b225e0293e286872822d3d3e -->
+<!-- translated-from: docs/03-backlog-generalization.md@0ad06220c587dbc56eca15e4552068f564aec71c -->
 
 Documentação de como o compilador Lingua Franca (`lfc`) passou a gerar `lfFPGA.a` nativamente para a plataforma `PYNQZCU104CC` (chip idêntico ao da ZCU106), eliminando a necessidade de reeditar arquivos manualmente a cada geração — e um guia para o time continuar desenvolvendo isso de forma autônoma.
 

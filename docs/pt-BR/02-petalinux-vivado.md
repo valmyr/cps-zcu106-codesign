@@ -3,7 +3,7 @@
 
 > 🇧🇷 **Português** · [🇬🇧 English](../02-petalinux-vivado.md) — a versão em inglês é a canônica.
 
-<!-- translated-from: docs/02-petalinux-vivado.md@f800594874f32cb2b225e0293e286872822d3d3e -->
+<!-- translated-from: docs/02-petalinux-vivado.md@0ad06220c587dbc56eca15e4552068f564aec71c -->
 
 Este documento reúne duas partes:
 
