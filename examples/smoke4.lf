@@ -1,5 +1,7 @@
 target Codesign {
-  fpgaBoard: ZCU106
+    fpgaBoard: ZCU106,
+    clock-period: 10 nsec,
+    timeout: 1 sec
 }
 reactor Fpga {
   input in: {= UInt(32.W) =}
