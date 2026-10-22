@@ -131,6 +131,7 @@ Os arquivos em `patches/` são **exatamente** o conteúdo que o `docker/lingua-f
                          │        .tar.gz no host     │
                          └───┬────────────────────┬───┘
          ZCU106Wrapper.v     │                    │   bin/ + lib/  (scp)
+         Q_srl.v             │                    │   
                              ▼                    │
     ┌─ HOST · Vivado + Vitis (licenciados) ──┐    │
     │   block design + síntese               │    │
@@ -159,8 +160,8 @@ Os arquivos em `patches/` são **exatamente** o conteúdo que o `docker/lingua-f
          ┌───────────────────────────────────────────────┐
          │  PLACA   ZCU106 — PL + PetaLinux              │
          │   xilinx-zcu106-2025.2:~$                     │
-         │    export LD_LIBRARY_PATH=./lib               │
-         │    ./bin/smoke_test  →  /dev/uioN → mmap      │
+         │   export LD_LIBRARY_PATH=./lib                │
+         │   ./bin/smoke_test  →  /dev/uioN → mmap       │
          └───────────────────────────────────────────────┘
 ```
 
