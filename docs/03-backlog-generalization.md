@@ -1,4 +1,7 @@
 # Backlog — Native ZCU106 support in `lfc`
+
+> 🇬🇧 **English** (canonical) · [🇧🇷 Português](pt-BR/03-backlog-generalization.md)
+
 Documentation of how the Lingua Franca compiler (`lfc`) came to generate `lfFPGA.a` natively for the `PYNQZCU104CC` platform (the same chip as the ZCU106), removing the need to re-edit files by hand on every generation — and a guide for the team to keep developing this autonomously.
 
 ---

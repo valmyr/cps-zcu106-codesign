@@ -1,5 +1,8 @@
 
 # Cyber-Physical Systems — PetaLinux environment (Docker + Tutorial)
+
+> 🇬🇧 **English** (canonical) · [🇧🇷 Português](pt-BR/02-petalinux-vivado.md)
+
 This document brings together two parts:
 
 1. **Dockerfile** — a containerized build environment for AMD/Xilinx PetaLinux 2025.2.

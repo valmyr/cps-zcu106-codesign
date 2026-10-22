@@ -1,4 +1,7 @@
 # Lingua Franca on FPGA
+
+> 🇬🇧 **English** (canonical) · [🇧🇷 Português](README.pt-BR.md)
+
 > Hardware and software described at the same level of abstraction:
 > reactors with deterministic concurrency, on both sides of the PL/PS
 > boundary of a Zynq UltraScale+.

@@ -1,4 +1,7 @@
 # Changelog - Dockerfile (Lingua Franca `chisel3` fork / Codesign target)
+
+> 🇬🇧 **English** (canonical) · [🇧🇷 Português](CHANGELOG.pt-BR.md)
+
 History of the fixes applied to the image, in the order in which they were
 introduced. Each entry references the corresponding item in `README.md`
 (the "READ BEFORE USING" section), where the full explanation of the problem

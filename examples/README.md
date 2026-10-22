@@ -1,4 +1,7 @@
 # examples/
+
+> 🇬🇧 **English** (canonical) · [🇧🇷 Português](README.pt-BR.md)
+
 | File | fpgaBoard | Use |
 |---|---|---|
 | `loopback_sim.lf` | `VerilatedTester` | validates the reactor logic by simulation — `make compiler PROJECT=examples/loopback_sim.lf ARCH=x86_64` |

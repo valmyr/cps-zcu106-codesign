@@ -1,4 +1,7 @@
 # Dockerfile - Build environment for Lingua Franca (`chisel3` fork / Codesign target)
+
+> 🇬🇧 **English** (canonical) · [🇧🇷 Português](pt-BR/01-dockerfile-lfc.md)
+
 > For the chronological history of every fix applied to the image, see
 > [`CHANGELOG.md`](../CHANGELOG.md).
 

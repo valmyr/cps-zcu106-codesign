@@ -1,4 +1,7 @@
 # patches/ — the fixes in isolation
+
+> 🇬🇧 **English** (canonical) · [🇧🇷 Português](README.pt-BR.md)
+
 Each file here is **exactly** the content that `docker/Dockerfile` injects into the
 compiler tree during the build. They are extracted here so they can be read, reviewed
 and versioned as code, not as a string inside a `RUN cat >`.

@@ -1,4 +1,7 @@
 # docs/ — source documentation
+
+> 🇬🇧 **English** (canonical) · [🇧🇷 Português](pt-BR/README.md)
+
 | File | What it covers |
 |---|---|
 | `01-dockerfile-lfc.md` | The image's 13 "read before using" items, the smoke tests, the Makefile, SSH, bind mounts. |
