@@ -1,120 +1,131 @@
-# Lingua Franca em FPGA
+# Lingua Franca on FPGA
+> Hardware and software described at the same level of abstraction:
+> reactors with deterministic concurrency, on both sides of the PL/PS
+> boundary of a Zynq UltraScale+.
 
-> Hardware e software descritos no mesmo nível de abstração:
-> reatores com concorrência determinística, de um lado e do outro
-> da fronteira PL/PS de um Zynq UltraScale+.
+Native support for the **Xilinx ZCU106** board in the Lingua Franca compiler
+(`erlingrj/lingua-franca` fork, `chisel3` branch, `Codesign` target).
+A single `.lf` file describes *hardware reactors*, synthesized through
+`reactor-chisel` into the programmable logic, and software reactors,
+compiled to C++ for the processor — one command generates, cross-compiles
+and packages both.
 
-Suporte nativo à placa **Xilinx ZCU106** no compilador Lingua Franca
-(fork `erlingrj/lingua-franca`, branch `chisel3`, target `Codesign`).
-Um único `.lf` descreve *hardware reactors*, sintetizados via
-`reactor-chisel` para a lógica programável, e reatores de software,
-compilados em C++ para o processador — um comando gera, cross-compila
-e empacota os dois.
-
-Baseado em *Codesign of Reactor-Oriented Hardware and Software for
-Cyber-Physical Systems* (Jellum, Schoeberl, Lee e Orlandic, ACM TRETS
-17(4), 2024). Este repositório contribui com a portabilidade para a
-ZCU106 e com a automação do fluxo de build.
+Based on *Codesign of Reactor-Oriented Hardware and Software for
+Cyber-Physical Systems* (Jellum, Schoeberl, Lee and Orlandic, ACM TRETS
+17(4), 2024). This repository contributes the port to the ZCU106 and the
+automation of the build flow.
 ---
 
-## 1. O que foi feito
+## 1. What was done
 
-Antes, gerar hardware + software para uma placa real exigia reaplicar patches manuais em Scala a cada projeto novo, mais dois comandos separados de compilação. Agora:
+Previously, generating hardware + software for a real board required
+reapplying manual Scala patches on every new project, plus two separate
+compilation commands. Now:
 
 ```bash
-lfc --target-compiler aarch64-linux-gnu-g++ meu_teste.lf
+lfc --target-compiler aarch64-linux-gnu-g++ my_test.lf
 ```
 
-gera o RTL (`ZCU106Wrapper.v`), compila o driver (`lfFPGA.a`) e cross-compila o software (`ELF … ARM aarch64`) — **num único comando, sem nenhuma edição manual.**
+generates the RTL (`ZCU106Wrapper.v`), compiles the driver (`lfFPGA.a`) and
+cross-compiles the software (`ELF … ARM aarch64`) — **in a single command,
+with no manual editing at all.**
 
 ---
 
-## 2. Estrutura do repositório
+## 2. Repository layout
 
 ```
 Cyber_PhysicalSystems/
-├── README.md                     <- o que foi feito
-├── CHANGELOG.md                  <- histórico cronológico das correções
+├── README.md                     <- what was done
+├── CHANGELOG.md                  <- chronological history of the fixes
 ├── LICENSE
 │
 ├── docker/
 │   ├── lingua-franca/
-│   │   └── Dockerfile            <- compilador lfc com as correções + smoke test
+│   │   └── Dockerfile            <- lfc compiler with the fixes + smoke tests
 │   └── petalinux/
-│       └── Dockerfile            <- ambiente de build do PetaLinux 2025.2
+│       └── Dockerfile            <- PetaLinux 2025.2 build environment
 │
-├── patches/                      <- AS CORREÇÕES, isoladas do Dockerfile
+├── patches/                      <- THE FIXES, isolated from the Dockerfile
 │   ├── reactor-chisel/
-│   │   └── Main.scala                      (mainCodesign genérico — peça central)
+│   │   └── Main.scala                      (generic mainCodesign — the centerpiece)
 │   ├── fpga-tidbits/
-│   │   ├── axi/ZCU106Wrapper.scala         (placa nova, identidade própria)
-│   │   ├── axi/PYNQZCU104CCWrapper.scala   (cópia de driver + -fpermissive)
-│   │   ├── axi/AXIPlatformWrapper.scala    (colisão de nome `csr`)
-│   │   ├── cpp/uiodriver.hpp               (driver UIO 64 bits, testável)
+│   │   ├── axi/ZCU106Wrapper.scala         (new board, its own identity)
+│   │   ├── axi/PYNQZCU104CCWrapper.scala   (driver copy + -fpermissive)
+│   │   ├── axi/AXIPlatformWrapper.scala    (`csr` name collision)
+│   │   ├── cpp/uiodriver.hpp               (64-bit UIO driver, testable)
 │   │   ├── cpp/platform-mpsoc-uio.cpp      (initPlatform/deinitPlatform)
-│   │   ├── patch_PlatformWrapper.py        (campos genéricos de driver)
-│   │   └── patch_Main_platformMap.py       (registro da ZCU106)
+│   │   ├── patch_PlatformWrapper.py        (generic driver fields)
+│   │   └── patch_Main_platformMap.py       (ZCU106 registration)
 │   └── compiler-kotlin/
-│       ├── patch_CodesignGenerator.py      (compila software para qualquer placa)
-│       └── patch_CodesignSwEmitter.py      (propaga --target-compiler)
+│       ├── patch_CodesignGenerator.py      (compiles software for any board)
+│       └── patch_CodesignSwEmitter.py      (propagates --target-compiler)
 │
 ├── tools/
-│   └── Makefile                  <- compilar/empacotar, com guarda simulação ou FPGA
+│   ├── Makefile                  <- compile/package, with a simulation-or-FPGA guard
+│   ├── sync-dockerfile-payloads.py  <- keeps the Dockerfile heredocs == patches/
+│   ├── check-translations.py        <- flags pt-BR docs behind their English source
+│   └── apply-translation.sh         <- lands this delivery in an existing clone
 │
 ├── examples/
-│   ├── loopback_sim.lf                                       (simulação)
+│   ├── loopback_sim.lf                                       (simulation)
 │   ├── smoke4.lf                                             (ZCU106, smoke test)
-│   ├── ExplorationMultipleReactorsCodesignAccelsOpBasics.lf  (ZCU106, 3 aceleradores)
+│   ├── ExplorationMultipleReactorsCodesignAccelsOpBasics.lf  (ZCU106, 3 accelerators)
 │   ├── ExplorationMultipleReactoresCodesign.lf
 │   └── led.lf
 │
 ├── docs/
-│   ├── 01-lingua-franca-chisel.md    (instalação manual, fora do Docker)
-│   ├── 02-dockerfile-lfc.md          (13 itens de "leia antes de usar")
-│   ├── 03-petalinux-vivado.md        (Vivado → XSA → SDT → PetaLinux → boot → deploy)
-│   └── 04-backlog-generalizacao.md   (como se chegou lá, fase a fase)
+│   ├── 01-dockerfile-lfc.md          (the 13 "read before using" items)
+│   ├── 02-petalinux-vivado.md        (Vivado → XSA → SDT → PetaLinux → boot → deploy)
+│   ├── 03-backlog-generalization.md  (how we got there, phase by phase)
+│   ├── 04-translation-strategy.md    (pt-BR → English: scope, commits, guards)
+│   ├── 05-bilingual-maintenance.md   (how both languages are kept in step)
+│   └── pt-BR/                        <- Portuguese counterparts
 │
-├── references/                   <- artigos, relatórios e material de apoio
-└── images/                       <- capturas usadas pelos tutoriais
+├── references/                   <- papers, reports and supporting material
+└── images/                       <- screenshots used by the tutorials
 ```
 
-Os arquivos em `patches/` são **exatamente** o conteúdo que o `docker/lingua-franca/Dockerfile` injeta via heredoc.
+The files under `patches/` are **exactly** the content that
+`docker/lingua-franca/Dockerfile` injects via heredoc.
 
 ---
 
-## 3. As correções, em ordem de dependência
+## 3. The fixes, in dependency order
 
-| # | Problema | Correção | Arquivo |
+| # | Problem | Fix | File |
 |---|---|---|---|
-| 1 | Submódulos em SSH, sem chave no container | `.gitmodules` → HTTPS + `insteadOf` global (cobre o aninhado) | `docker/lingua-franca/Dockerfile` |
-| 2 | `chisel3`/`chiseltest` desalinhados em 4 arquivos | `sed` por regex de patch-version → dupla 3.6.x / 0.6.x | `docker/lingua-franca/Dockerfile` |
-| 3 | `.asUInt()` depreciado | `sed` → `.asUInt` | `docker/lingua-franca/Dockerfile` |
-| 4 | Colisão de nome `csr` na elaboração | `Wire` interno renomeado para `csrSlave` | `patches/fpga-tidbits/axi/AXIPlatformWrapper.scala` |
-| 5 | Wrapper nunca copiava os arquivos de driver | `generateRegDriver` + `resourceCopyBulk` | `patches/fpga-tidbits/axi/PYNQZCU104CCWrapper.scala` |
-| 6 | `xlnk` não existe em kernels `linux-xlnx` modernos | driver canônico via **UIO** (`mmap` de `/dev/uioN`) | `patches/fpga-tidbits/cpp/uiodriver.hpp` |
-| 7 | Driver hardcoded só para `VerilatedTester` | campos `platformMainDriverFile` / `platformDriverExtraFlags` lidos da instância do wrapper | `patch_PlatformWrapper.py` + `reactor-chisel/Main.scala` |
-| 8 | Sem identidade para a ZCU106 | wrapper próprio + registro em `platformMap`/`fpgaPartMap` | `ZCU106Wrapper.scala` + `patch_Main_platformMap.py` |
-| 9 | Software só compilava para simulação | condição removida | `patch_CodesignGenerator.py` |
-| 10 | `--target-compiler` perdido na 2ª geração interna | escreve `compiler:` no `_SwTop.lf` gerado | `patch_CodesignSwEmitter.py` |
+| 1 | Submodules over SSH, no key inside the container | `.gitmodules` → HTTPS + global `insteadOf` (covers the nested one) | `docker/lingua-franca/Dockerfile` |
+| 2 | `chisel3`/`chiseltest` out of sync across 4 files | `sed` with a patch-version regex → 3.6.x / 0.6.x pair | `docker/lingua-franca/Dockerfile` |
+| 3 | Deprecated `.asUInt()` | `sed` → `.asUInt` | `docker/lingua-franca/Dockerfile` |
+| 4 | `csr` name collision during elaboration | internal `Wire` renamed to `csrSlave` | `patches/fpga-tidbits/axi/AXIPlatformWrapper.scala` |
+| 5 | Wrapper never copied the driver files | `generateRegDriver` + `resourceCopyBulk` | `patches/fpga-tidbits/axi/PYNQZCU104CCWrapper.scala` |
+| 6 | `xlnk` does not exist in modern `linux-xlnx` kernels | canonical driver via **UIO** (`mmap` of `/dev/uioN`) | `patches/fpga-tidbits/cpp/uiodriver.hpp` |
+| 7 | Driver hardcoded for `VerilatedTester` only | `platformMainDriverFile` / `platformDriverExtraFlags` fields read from the wrapper instance | `patch_PlatformWrapper.py` + `reactor-chisel/Main.scala` |
+| 8 | No identity for the ZCU106 | dedicated wrapper + registration in `platformMap`/`fpgaPartMap` | `ZCU106Wrapper.scala` + `patch_Main_platformMap.py` |
+| 9 | Software was only compiled for simulation | condition removed | `patch_CodesignGenerator.py` |
+| 10 | `--target-compiler` lost in the 2nd internal generation | writes `compiler:` into the generated `_SwTop.lf` | `patch_CodesignSwEmitter.py` |
 
-**Generalização para novas placas Xilinx (#7):** adicionar uma placa nova custa 1 arquivo de wrapper + 2 linhas de registro. Validado com a placa fictícia `TESTBOARD`, sem tocar em `mainCodesign`.
+**Generalization to new Xilinx boards (#7):** adding a new board costs
+1 wrapper file + 2 registration lines. Validated with the fictitious
+`TESTBOARD`, without touching `mainCodesign`.
 
 ---
 
-## 4. Fluxo
+## 4. Flow
 
 ```
 ┌─ DOCKER · lf-chisel ───────────────────────────────────────────────────┐
 │                                                                        │
 │   smoke_test.lf                                                        │
-│        │  make deploy PROJETO=smoke_test.lf ARCH=arm                   │
+│        │  make deploy PROJECT=smoke_test.lf ARCH=arm                   │
 │        ▼                                                               │
 │        ├──► hardware (Chisel) ─► _FpgaTop ─┬─► ZCU106Wrapper.v         │
 │        │                                   │                           │
 │        │                                   └─► lfFPGA.a                │
 │        │                                       (UioDriver, ARM64)      │
 │        │                                            │                  │
-│        └──► software (C++) ─► bin/ ◄───── linka ────┘                  │
+│        └──► software (C++) ─► bin/ ◄───── links ────┘                  │
 │                               (ELF ARM aarch64)                        │
 │                                      │                                 │
 │                                      ▼                                 │
@@ -128,13 +139,13 @@ Os arquivos em `patches/` são **exatamente** o conteúdo que o `docker/lingua-f
                                      │  bind mount / docker cp
                                      ▼
                          ┌────────────────────────────┐
-                         │        .tar.gz no host     │
+                         │      .tar.gz on the host   │
                          └───┬────────────────────┬───┘
          ZCU106Wrapper.v     │                    │   bin/ + lib/  (scp)
          Q_srl.v             │                    │   
                              ▼                    │
-    ┌─ HOST · Vivado + Vitis (licenciados) ──┐    │
-    │   block design + síntese               │    │
+    ┌─ HOST · Vivado + Vitis (licensed) ─────┐    │
+    │   block design + synthesis             │    │
     │        ├──► bitstream ───────────────┐ │    │
     │        │                             │ │    │
     │        └──► XSA ──xsct/sdtgen──► SDT │ │    │
@@ -154,29 +165,31 @@ Os arquivos em `patches/` são **exatamente** o conteúdo que o `docker/lingua-f
          │   ├── image.ub                │ │      │
          │   └── rootfs.cpio.gz.u-boot   │ │      │
          └────────│──────────────────────┘ │      │
-                  │  pen drive →           │      │
+                  │  USB stick →           │      │
                   │  fatload + bootm       │      │
                   ▼                        ▼      ▼
          ┌───────────────────────────────────────────────┐
-         │  PLACA   ZCU106 — PL + PetaLinux              │
+         │  BOARD   ZCU106 — PL + PetaLinux              │
          │   xilinx-zcu106-2025.2:~$                     │
          │   export LD_LIBRARY_PATH=./lib                │
          │   ./bin/smoke_test  →  /dev/uioN → mmap       │
          └───────────────────────────────────────────────┘
 ```
 
-Simule primeiro, sem a diretiva `fpgaBoard`; adicione-a só depois que a lógica estiver validada (ver 5.1). Isso isola bug de lógica de bug de plataforma.
+Simulate first, without the `fpgaBoard` directive; add it only once the
+logic has been validated (see 5.1). That isolates logic bugs from platform
+bugs.
 
 ---
 
-## 5. Como rodar
+## 5. How to run
 
 ```bash
 cd docker/lingua-franca && docker build -t lf-chisel .
 docker run -it --rm -v "$(pwd)/../../examples:/workspace" lf-chisel
 ```
 
-Dentro do container:
+Inside the container:
 
 ```bash
 cd /workspace
@@ -184,55 +197,76 @@ lfc --target-compiler aarch64-linux-gnu-g++ smoke4.lf
 file codesign-gen/smoke4/bin/_SwTop        # ELF 64-bit … ARM aarch64
 ```
 
-Requisitos: ≥15 GB de disco e ≥8 GB de RAM para o `docker build`.
+Requirements: ≥15 GB of disk and ≥8 GB of RAM for the `docker build`.
 
-O container roda como `lingua-franca` (senha `1234`), com `WORKDIR` em `/home/lingua-franca`, onde já estão o `Makefile` e um `.lf` de exemplo. A primeira compilação Codesign de cada container baixa as dependências do `sbt` e leva alguns minutos. Para detalhes — bind mounts para os artefatos de deploy, acesso SSH, onde ficam os testes do fork — veja [`docs/01-dockerfile-lfc.md`](docs/01-dockerfile-lfc.md).
+The container runs as `lingua-franca` (password `1234`), with `WORKDIR` at
+`/home/lingua-franca`, where the `Makefile` and a sample `.lf` are already
+present. The first Codesign build in each container downloads the `sbt`
+dependencies and takes a few minutes. For details — bind mounts for the
+deploy artifacts, SSH access, where the fork's tests live — see
+[`docs/01-dockerfile-lfc.md`](docs/01-dockerfile-lfc.md).
 
-### 5.1 Simulação vs. FPGA
+### 5.1 Simulation vs. FPGA
 
-Também é possível compilar pelo `Makefile` (`tools/Makefile`, já presente em `~/Makefile` na imagem). O modo é determinado por **uma única diretiva no `.lf`** — e o `ARCH` passado ao `make` precisa combinar com ela.
+You can also build through the `Makefile` (`tools/Makefile`, already present
+as `~/Makefile` in the image). The mode is determined by **a single
+directive in the `.lf`** — and the `ARCH` passed to `make` has to match it.
 
-| Modo | No `target Codesign` | `ARCH` | Compilador |
+| Mode | In `target Codesign` | `ARCH` | Compiler |
 |---|---|---|---|
-| **FPGA** (hardware real) | `fpgaBoard: ZCU106` **presente** | `arm` | `aarch64-linux-gnu-g++` |
-| **Simulação** (Verilator) | `fpgaBoard` **ausente** | `x86_64` | `g++` nativo |
+| **FPGA** (real hardware) | `fpgaBoard: ZCU106` **present** | `arm` | `aarch64-linux-gnu-g++` |
+| **Simulation** (Verilator) | `fpgaBoard` **absent** | `x86_64` | native `g++` |
 
-> **Atenção:** para simular, a diretiva `fpgaBoard` precisa ser **removida** — não basta trocar o valor. Com ela presente, o `lfc` gera o `lfFPGA.a` cross-compilado para ARM64 e tenta linkar o software contra ele; num binário x86 isso falha no linker (`Relocations in generic ELF (EM: 183)` / `error adding symbols: file in wrong format`).
+> **Careful:** to simulate, the `fpgaBoard` directive has to be **removed** —
+> changing its value is not enough. With it present, `lfc` generates
+> `lfFPGA.a` cross-compiled for ARM64 and tries to link the software against
+> it; in an x86 binary that fails at link time (`Relocations in generic ELF
+> (EM: 183)` / `error adding symbols: file in wrong format`).
 
 ```bash
-# FPGA — o .lf precisa ter `fpgaBoard: ZCU106`
-make deploy PROJETO=smoke4.lf ARCH=arm
-# compila hardware + software e empacota smoke4_<timestamp>_deploy.tar.gz
+# FPGA — the .lf must have `fpgaBoard: ZCU106`
+make deploy PROJECT=smoke4.lf ARCH=arm
+# builds hardware + software and packages smoke4_<timestamp>_deploy.tar.gz
 
-# Simulação — o .lf NÃO pode ter a linha `fpgaBoard`
-make compiler PROJETO=loopback_sim.lf ARCH=x86_64
-# compila e roda local; não empacota (não há bitstream a entregar)
+# Simulation — the .lf must NOT have the `fpgaBoard` line
+make compiler PROJECT=loopback_sim.lf ARCH=x86_64
+# builds and runs locally; no packaging (there is no bitstream to deliver)
 ```
 
 ---
 
-## 6. Testes de validação
+## 6. Validation tests
 
-| # | Valida | Onde roda | Status |
+| # | Validates | Where it runs | Status |
 |---|---|---|---|
-| 1 | Lógica do `UioDriver` contra um `/sys` falso (round-trip de registradores, busca por nome) | `docker build` | Pass |
-| 2 | Simulação ponta a ponta, assinatura `aeef7c29` do `CodesignTopReactor` | `docker build` | Pass |
-| 3 | `lfFPGA.a` para `ZCU106` contendo `platform-mpsoc-uio.o`, sem warnings | `docker build` | Pass |
-| 4 | Compilação automática do software: `ELF … ARM aarch64` com um único comando | `docker build` | Pass |
-| 5 | Execução na placa física (bitstream + device tree) | fora do Docker | Pass |
+| 1 | `UioDriver` logic against a fake `/sys` (register round-trip, lookup by name) | `docker build` | Pass |
+| 2 | End-to-end simulation, `aeef7c29` signature of `CodesignTopReactor` | `docker build` | Pass |
+| 3 | `lfFPGA.a` for `ZCU106` containing `platform-mpsoc-uio.o`, no warnings | `docker build` | Pass |
+| 4 | Automatic software compilation: `ELF … ARM aarch64` with a single command | `docker build` | Pass |
+| 5 | Execution on the physical board (bitstream + device tree) | outside Docker | Pass |
 
-Falha em qualquer um dos testes 1 a 4 impede a imagem de ser construída, em vez de o problema só aparecer na primeira vez que alguém usar o container.
+A failure in any of tests 1 through 4 prevents the image from being built,
+instead of the problem only showing up the first time someone uses the
+container.
 
-O teste 5 não roda no `docker build`: ele exige criar o projeto no Vivado, gerar o XSA e compilar o PetaLinux. O procedimento completo está em [`docs/02-petalinux-vivado.md`](docs/02-petalinux-vivado.md).
+Test 5 does not run during `docker build`: it requires creating the Vivado
+project, generating the XSA and building PetaLinux. The full procedure is in
+[`docs/02-petalinux-vivado.md`](docs/02-petalinux-vivado.md).
 
 ---
 
-## 7. Pendências
+## 7. Open items
 
-Dentro do compilador e da imagem, nenhuma bloqueante. Fora deles:
+Inside the compiler and the image, nothing blocking. Outside them:
 
-- Reset do `ZCU106Wrapper`: ligar em `peripheral_reset` (ativo-alto), não em `peripheral_aresetn` — conexão manual no Block Design.
-- `clock-period` **tem** que ser declarado no `.lf` antes de qualquer síntese: o default (1 nsec ≙ 1 GHz) dessincroniza a coordenação de tags do clock físico.
-- Overlay de device tree `generic-uio` + bootarg `uio_pdrv_genirq.of_id=generic-uio` no PetaLinux.
-- Bug em investigação: `logicalTagComplete` trava em `Tag.FOREVER` acima de ~2,15 s de tempo lógico (suspeita de comparação com sinal).
-- GCC 11 / AArch64: *internal compiler error* intermitente em `std::regex` ao compilar `main.cc`.
+- `ZCU106Wrapper` reset: wire it to `peripheral_reset` (active-high), not to
+  `peripheral_aresetn` — a manual connection in the Block Design.
+- `clock-period` **must** be declared in the `.lf` before any synthesis: the
+  default (1 nsec ≙ 1 GHz) desynchronizes tag coordination from the physical
+  clock.
+- `generic-uio` device tree overlay + `uio_pdrv_genirq.of_id=generic-uio`
+  bootarg in PetaLinux.
+- Bug under investigation: `logicalTagComplete` gets stuck at `Tag.FOREVER`
+  beyond ~2.15 s of logical time (a signed comparison is suspected).
+- GCC 11 / AArch64: intermittent *internal compiler error* in `std::regex`
+  when compiling `main.cc`.

@@ -1,188 +1,187 @@
-# Changelog - Dockerfile (Lingua Franca fork `chisel3` / target Codesign)
+# Changelog - Dockerfile (Lingua Franca `chisel3` fork / Codesign target)
+History of the fixes applied to the image, in the order in which they were
+introduced. Each entry references the corresponding item in `README.md`
+(the "READ BEFORE USING" section), where the full explanation of the problem
+and of the fix is detailed.
 
-Histórico das correções aplicadas à imagem, na ordem em que foram
-introduzidas. Cada entrada referencia o item correspondente no
-`README.md` (seção "LEIA ANTES DE USAR"), onde a explicação completa do
-problema e da correção está detalhada.
+## [Unreleased]
 
-## [Não versionado]
+### Fixed
+- **`PYNQZCU104CCWrapper` never actually copied the driver files.**
+  The wrapper only *defined* `platformDriverFiles`, without calling
+  `resourceCopyBulk`/`generateRegDriver` - `build/` never contained
+  `platform.h`/`CodesignTopReactor.hpp`/the driver for that platform.
+  Fixed; it now also overrides `platformDriverExtraFlags` with
+  `-fpermissive` (needed because `linuxphysregdriver.hpp` was written for
+  32-bit ARM and casts `void*` to `unsigned int`, which is rejected by
+  default on ARM64).
 
-### Corrigido
-- **`PYNQZCU104CCWrapper` nunca copiava os arquivos de driver de fato.**
-  O wrapper só *definia* `platformDriverFiles`, sem chamar
-  `resourceCopyBulk`/`generateRegDriver` - `build/` nunca continha
-  `platform.h`/`CodesignTopReactor.hpp`/o driver para essa plataforma.
-  Corrigido; também passou a sobrescrever `platformDriverExtraFlags` com
-  `-fpermissive` (necessário porque `linuxphysregdriver.hpp` foi escrito
-  para ARM 32 bits e faz cast de `void*` para `unsigned int`, rejeitado
-  por padrão em ARM64).
+  See README, item 8.1.
 
-  Ver README, item 8.1.
+- **The `xlnk` driver does not exist in modern `linux-xlnx` kernels.**
+  Confirmed by reading the driver's own source code in the BSP of a real
+  ZCU106 (PetaLinux 2025.2): `xlnk`'s `of_match_table` is empty by default,
+  so the device is never created. Replaced with a canonical driver based on
+  the kernel's UIO subsystem (`uio_pdrv_genirq` + `mmap` of `/dev/uioN`),
+  with no dependency on any proprietary Xilinx library - `uiodriver.hpp` /
+  `platform-mpsoc-uio.cpp`, both new.
 
-- **Driver `xlnk` inexistente em kernels `linux-xlnx` modernos.**
-  Confirmado lendo o próprio código-fonte do driver no BSP de uma ZCU106
-  real (PetaLinux 2025.2): a `of_match_table` do `xlnk` está vazia por
-  padrão, o dispositivo nunca é criado. Substituído por um driver
-  canônico baseado no subsistema UIO do kernel
-  (`uio_pdrv_genirq` + `mmap` de `/dev/uioN`), sem depender de nenhuma lib
-  proprietária da Xilinx - `uiodriver.hpp` / `platform-mpsoc-uio.cpp`,
-  novos.
+  See README, item 8.2.
 
-  Ver README, item 8.2.
+- **`mainCodesign` had the driver to compile *hardcoded* for
+  `VerilatedTester` only.**
+  Generalized: `PlatformWrapper.scala` gained the fields
+  `platformMainDriverFile` (inferred automatically) and
+  `platformDriverExtraFlags` (empty default), with safe defaults that do not
+  break the pre-existing wrappers that do not override them.
+  `mainCodesign` (`reactor-chisel/src/main/scala/Main.scala`) now reads
+  those fields from the wrapper instance instead of having the file
+  name/flags fixed in the code - any new real board now works without
+  editing that file again. Validated by creating a fictitious board
+  (`TESTBOARD`) touching a single new file + two registration lines.
 
-- **`mainCodesign` com o driver a compilar *hardcoded* só para
-  `VerilatedTester`.**
-  Generalizado: `PlatformWrapper.scala` ganhou os campos
-  `platformMainDriverFile` (deduzido automaticamente) e
-  `platformDriverExtraFlags` (default vazio), com defaults seguros que
-  não quebram os wrappers pré-existentes que não os sobrescrevem.
-  `mainCodesign` (`reactor-chisel/src/main/scala/Main.scala`) agora lê
-  esses campos da instância do wrapper em vez de ter nome de arquivo/flags
-  fixos no código - qualquer placa real nova passa a funcionar sem editar
-  esse arquivo de novo. Validado criando uma placa fictícia (`TESTBOARD`)
-  tocando em um único arquivo novo + duas linhas de registro.
-
-  Corrigido também, no meio-tempo: instanciar o wrapper fora do bloco
-  passado por nome ao `emitVerilog` falhava com
+  Also fixed along the way: instantiating the wrapper outside the by-name
+  block passed to `emitVerilog` failed with
   `java.lang.IllegalArgumentException: requirement failed: must be inside
-  Builder context` (elaboração de `Module` só é permitida dentro do
-  contexto do Chisel Builder) - resolvido capturando a instância numa
-  `var` externa, atribuída dentro do próprio bloco por nome.
+  Builder context` (`Module` elaboration is only allowed inside the Chisel
+  Builder context) - resolved by capturing the instance in an external
+  `var`, assigned inside the by-name block itself.
 
-  Ver README, item 8.3.
+  See README, item 8.3.
 
-- **Software nunca era compilado automaticamente para placas reais (só
-  para `VerilatedTester`).**
-  `CodesignGenerator.kt`: a condição `if
-  (targetConfig.fpgaBoard.equals("VerilatedTester"))` que controlava a
-  chamada de `swEmitter.compile()` virou incondicional (`if (true)`).
+- **The software was never compiled automatically for real boards (only for
+  `VerilatedTester`).**
+  `CodesignGenerator.kt`: the condition `if
+  (targetConfig.fpgaBoard.equals("VerilatedTester"))` that gated the
+  `swEmitter.compile()` call became unconditional (`if (true)`).
 
-  Ver README, item 9.1.
+  See README, item 9.1.
 
-- **`--target-compiler` não chegava à segunda passada de geração interna
-  do software, mesmo com a correção acima.**
-  `CodesignSwEmitter.compile()` cria um `MainContext`/`TargetConfig` novo
-  internamente, com `Properties()` vazio como argumentos de linha de
-  comando - o `--target-compiler` original nunca chegava até essa segunda
-  geração, fazendo a compilação automática sempre cair no compilador
-  nativo x86 e falhar no link com `lfFPGA.a` ARM64
+- **`--target-compiler` did not reach the second internal software
+  generation pass, even with the fix above.**
+  `CodesignSwEmitter.compile()` creates a new `MainContext`/`TargetConfig`
+  internally, with an empty `Properties()` as command-line arguments - the
+  original `--target-compiler` never reached that second generation, making
+  the automatic compilation always fall back to the native x86 compiler and
+  fail at link time against the ARM64 `lfFPGA.a`
   (`Relocations in generic ELF (EM: 183)` /
-  `error adding symbols: file in wrong format`). Corrigido em
-  `generateTarget()` (`CodesignSwEmitter.kt`): passou a escrever
-  `compiler: "<valor>"` no `_SwTop.lf` gerado quando
-  `targetConfig.compiler` não está vazio, propagando o compilador
-  corretamente através da segunda geração.
+  `error adding symbols: file in wrong format`). Fixed in
+  `generateTarget()` (`CodesignSwEmitter.kt`): it now writes
+  `compiler: "<value>"` into the generated `_SwTop.lf` whenever
+  `targetConfig.compiler` is not empty, propagating the compiler correctly
+  through the second generation.
 
-  Ver README, item 9.2.
+  See README, item 9.2.
 
-- **Pacote `file` ausente na imagem base.**
-  Necessário tanto para os smoke tests (checar arquitetura do binário
-  gerado) quanto para uso manual geral; adicionado à lista de pacotes
-  `apt-get install`.
+- **The `file` package was missing from the base image.**
+  Needed both for the smoke tests (checking the architecture of the
+  generated binary) and for general manual use; added to the `apt-get
+  install` package list.
 
-  Ver README, item 11.
+  See README, item 11.
 
-- **Colisão de nome `csr` no `AXIPlatformWrapper.scala`.**
-  A elaboração de hardware falhava com:
+- **`csr` name collision in `AXIPlatformWrapper.scala`.**
+  Hardware elaboration failed with:
   `Attempted to name ZedBoardWrapper.csr: IO[AXILiteExternalIF] with a
   duplicated name 'csr'. Use suggestName to seed a unique name`.
-  O `Wire` interno da lógica de regfile, antes chamado `csr`, foi
-  renomeado para `csrSlave` (o IO externo `csr` foi mantido). A correção
-  agora é aplicada às duas cópias do arquivo encontradas no repositório:
+  The internal `Wire` of the regfile logic, previously named `csr`, was
+  renamed to `csrSlave` (the external `csr` IO was kept). The fix is now
+  applied to both copies of the file found in the repository:
   - `core/src/main/resources/lib/chisel/.../platform-wrapper/axi/AXIPlatformWrapper.scala`
   - `core/build/resources/main/lib/chisel/.../platform-wrapper/axi/AXIPlatformWrapper.scala`
 
-  Aproveitando a mesma edição, a construção da fila de write data trocou
-  de `FPGAQueue(writeBurstAdp.out_writeData, 2) <> mem(i).writeData` para
-  uma instância explícita `Module(new FPGAQueue(...))`.
+  Taking advantage of the same edit, the construction of the write data
+  queue changed from `FPGAQueue(writeBurstAdp.out_writeData, 2) <>
+  mem(i).writeData` to an explicit `Module(new FPGAQueue(...))` instance.
 
-  Ver README, item 8.
+  See README, item 8.
 
-- **`chisel3`/`chiseltest` desalinhados entre os 4 arquivos que declaram
-  a versão.**
-  A troca de versão anterior (`3.5.3 → 3.6.0`, `0.5.1 → 0.6.0`) não
-  cobriu o `fpga-tidbits/build.sbt` (que partia de `3.5.6`/`0.5.6`),
-  causando o conflito binário `chisel3_2.13:3.6.0 ... is selected over
-  3.5.6 for test` / `chiseltest_2.13:0.5.6 (depends on 3.5.6)`. A
-  substituição passou a usar regex de patch-version
-  (`3\.5\.[0-9]+` → `3.6.0`, `0\.5\.[0-9]+` → `0.6.0`) em vez de valores
-  exatos, garantindo que os 4 arquivos fiquem na mesma dupla compatível.
+- **`chisel3`/`chiseltest` out of sync across the 4 files that declare the
+  version.**
+  The previous version bump (`3.5.3 → 3.6.0`, `0.5.1 → 0.6.0`) did not
+  cover `fpga-tidbits/build.sbt` (which started from `3.5.6`/`0.5.6`),
+  causing the binary conflict `chisel3_2.13:3.6.0 ... is selected over
+  3.5.6 for test` / `chiseltest_2.13:0.5.6 (depends on 3.5.6)`. The
+  replacement now uses a patch-version regex
+  (`3\.5\.[0-9]+` → `3.6.0`, `0\.5\.[0-9]+` → `0.6.0`) instead of exact
+  values, guaranteeing that all 4 files end up on the same compatible pair.
 
-  Ver README, item 2.
+  See README, item 2.
 
-- **Submódulos apontando para SSH (`git@github.com:...`) sem chave
-  disponível no container.**
-  `.gitmodules` do `lingua-franca` corrigido via `sed` para HTTPS; o
-  submódulo aninhado (`reactor-chisel` → `fpga-tidbits`) é coberto pelo
+- **Submodules pointing at SSH (`git@github.com:...`) with no key available
+  inside the container.**
+  The `lingua-franca` `.gitmodules` is fixed via `sed` to HTTPS; the nested
+  submodule (`reactor-chisel` → `fpga-tidbits`) is covered by the global
   `git config --global url."https://github.com/".insteadOf
-  git@github.com:` global, sem precisar de um segundo `sed`.
+  git@github.com:`, with no need for a second `sed`.
 
-  Ver README, item 3.
+  See README, item 3.
 
-- **`.asUInt()` incompatível com a versão atualizada do Chisel** em
-  `PlatformWrapper.scala` (`fpga-tidbits`), corrigido via `sed` para
-  `.asUInt` (sem parênteses).
+- **`.asUInt()` incompatible with the updated Chisel version** in
+  `PlatformWrapper.scala` (`fpga-tidbits`), fixed via `sed` to `.asUInt`
+  (without parentheses).
 
-### Adicionado
-- **Suporte nativo à placa `ZCU106`** (`fpgaBoard: ZCU106`), com wrapper
-  próprio (`ZCU106Wrapper.scala`, mesmo chip da PYNQZCU104CC,
-  `xczu7ev-ffvc1156-2-e`), registrado em `platformMap`/`fpgaPartMap`
-  (`fpgatidbits/Main.scala`). Compila de forma limpa, sem warnings
-  (diferente de `PYNQZCU104CC`, que usa o driver legado de 32 bits com
+### Added
+- **Native support for the `ZCU106` board** (`fpgaBoard: ZCU106`), with its
+  own wrapper (`ZCU106Wrapper.scala`, same chip as the PYNQZCU104CC,
+  `xczu7ev-ffvc1156-2-e`), registered in `platformMap`/`fpgaPartMap`
+  (`fpgatidbits/Main.scala`). It compiles cleanly, with no warnings (unlike
+  `PYNQZCU104CC`, which uses the legacy 32-bit driver with
   `-fpermissive`).
 
-  Ver README, item 8.
+  See README, item 8.
 
-- **Quatro smoke tests embutidos no `docker build`**, validando: lógica
-  isolada do `UioDriver` sem hardware; fluxo de simulação
-  (`VerilatedTester`) de ponta a ponta; geração de `lfFPGA.a` para
-  `ZCU106`; compilação automática do software para `ZCU106` com um único
-  comando. Falha em qualquer um deles impede a imagem de ser construída,
-  em vez de só aparecer na primeira vez que alguém usar o container.
+- **Four smoke tests embedded in the `docker build`**, validating: the
+  `UioDriver` logic in isolation, without hardware; the end-to-end
+  simulation flow (`VerilatedTester`); generation of `lfFPGA.a` for
+  `ZCU106`; automatic compilation of the software for `ZCU106` with a
+  single command. A failure in any of them prevents the image from being
+  built, instead of only showing up the first time someone uses the
+  container.
 
-  Ver README, seção "Smoke tests embutidos".
+  See README, the "Embedded smoke tests" section.
 
-- **Tema do Oh My Zsh (`jonathan`)**, configurado via `sed` no
-  `~/.zshrc` logo após a instalação. Puramente cosmético.
+- **Oh My Zsh theme (`jonathan`)**, configured via `sed` in `~/.zshrc`
+  right after installation. Purely cosmetic.
 
-  Ver README, item 13.
+  See README, item 13.
 
-- **Requisito de `fpgaBoard` no `target Codesign`.**
-  Documentada a obrigatoriedade de declarar a plataforma alvo em todo
-  `.lf` que usa `target Codesign` (ex.: `fpgaBoard: "PYNQZCU104CC"`),
-  com a lista das plataformas suportadas pelo `fpga-tidbits` e o
-  equivalente manual via `sbt "fpgatidbits/run verilog <acc> <platform>"`
-  dentro de `src-gen/reactor-chisel`.
+- **`fpgaBoard` requirement in `target Codesign`.**
+  Documented the obligation to declare the target platform in every `.lf`
+  that uses `target Codesign` (e.g. `fpgaBoard: "PYNQZCU104CC"`), together
+  with the list of platforms supported by `fpga-tidbits` and the manual
+  equivalent via `sbt "fpgatidbits/run verilog <accel> <platform>"` inside
+  `src-gen/reactor-chisel`.
 
-  Ver README, item 7.
+  See README, item 7.
 
-- **Requisito de espaço em disco:** mínimo de 3 GB livres antes do
-  `docker build`, sem contar o que o `sbt` baixa na primeira compilação
-  de um target Codesign real (`chisel3`/`chiseltest`/Scala).
+- **Disk space requirement:** at least 3 GB free before the `docker build`,
+  not counting what `sbt` downloads during the first build of a real
+  Codesign target (`chisel3`/`chiseltest`/Scala).
 
-  Ver README, seção "Requisitos".
+  See README, the "Requirements" section.
 
-### Conhecido (não corrigido nesta imagem)
-- **`internal compiler error: Segmentation fault` do GCC 11**, ao
-  compilar `main.cc` (gerado automaticamente pelo framework, usa
-  `std::regex` internamente) em cross-compilação para AArch64. Ocorreu de
-  forma intermitente durante o desenvolvimento; memória insuficiente
-  descartada como causa (62 GB disponíveis no ambiente onde ocorreu).
-  Hipóteses ainda não confirmadas: bug do GCC 11 específico desse padrão
-  de template; sensibilidade a nível de otimização.
+### Known (not fixed in this image)
+- **GCC 11 `internal compiler error: Segmentation fault`** when compiling
+  `main.cc` (generated automatically by the framework, which uses
+  `std::regex` internally) while cross-compiling for AArch64. It occurred
+  intermittently during development; insufficient memory was ruled out as
+  the cause (62 GB available in the environment where it happened).
+  Hypotheses not yet confirmed: a GCC 11 bug specific to that template
+  pattern; sensitivity to the optimization level.
 
-  Ver README, item 10.
+  See README, item 10.
 
-- **Reset do `ZCU106Wrapper` precisa ser conectado manualmente à saída
-  ativa-em-alto do `proc_sys_reset` no Block Design do Vivado**
-  (`peripheral_reset`, não `peripheral_aresetn`) - fora do escopo deste
-  Dockerfile/compilador, documentado no backlog de bring-up da placa
-  física.
+- **The `ZCU106Wrapper` reset has to be connected manually to the
+  active-high output of `proc_sys_reset` in the Vivado Block Design**
+  (`peripheral_reset`, not `peripheral_aresetn`) - outside the scope of
+  this Dockerfile/compiler, documented in the physical board bring-up
+  backlog.
 
-- **Bug em investigação na coordenação de tempo lógico**:
-  `logicalTagComplete` trava em `Tag.FOREVER` (`0x80000000`) quando o
-  tempo lógico acumulado de execução ultrapassa ~2,15 segundos (`2^31`
-  ns) - suspeita de comparação com sinal indevida em algum ponto da
-  lógica gerada em Chisel, sem correção confirmada ainda.
+- **Bug under investigation in logical time coordination**:
+  `logicalTagComplete` gets stuck at `Tag.FOREVER` (`0x80000000`) once the
+  accumulated logical execution time goes beyond ~2.15 seconds (`2^31` ns) -
+  an improper signed comparison somewhere in the generated Chisel logic is
+  suspected; no confirmed fix yet.
 
-  Ver README, "Pendências conhecidas".
+  See README, "Known open items".
