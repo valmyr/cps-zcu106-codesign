@@ -76,8 +76,6 @@ Cyber_PhysicalSystems/
 │   ├── 01-dockerfile-lfc.md          (13 itens de "leia antes de usar")
 │   ├── 02-petalinux-vivado.md        (Vivado → XSA → SDT → PetaLinux → boot → deploy)
 │   ├── 03-backlog-generalization.md  (como se chegou lá, fase a fase)
-│   ├── 04-translation-strategy.md    (pt-BR → inglês: escopo, commits, guardas)
-│   ├── 05-bilingual-maintenance.md   (como as duas versões são mantidas)
 │   └── pt-BR/                        <- esta tradução
 │
 ├── references/                   <- artigos, relatórios e material de apoio

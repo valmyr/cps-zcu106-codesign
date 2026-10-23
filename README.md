@@ -65,10 +65,7 @@ Cyber_PhysicalSystems/
 │       └── patch_CodesignSwEmitter.py      (propagates --target-compiler)
 │
 ├── tools/
-│   ├── Makefile                  <- compile/package, with a simulation-or-FPGA guard
-│   ├── sync-dockerfile-payloads.py  <- keeps the Dockerfile heredocs == patches/
-│   ├── check-translations.py        <- flags pt-BR docs behind their English source
-│   └── apply-translation.sh         <- lands this delivery in an existing clone
+│   └── Makefile                  <- compile/package, with a simulation-or-FPGA guard
 │
 ├── examples/
 │   ├── loopback_sim.lf                                       (simulation)
@@ -81,8 +78,6 @@ Cyber_PhysicalSystems/
 │   ├── 01-dockerfile-lfc.md          (the 13 "read before using" items)
 │   ├── 02-petalinux-vivado.md        (Vivado → XSA → SDT → PetaLinux → boot → deploy)
 │   ├── 03-backlog-generalization.md  (how we got there, phase by phase)
-│   ├── 04-translation-strategy.md    (pt-BR → English: scope, commits, guards)
-│   ├── 05-bilingual-maintenance.md   (how both languages are kept in step)
 │   └── pt-BR/                        <- Portuguese counterparts
 │
 ├── references/                   <- papers, reports and supporting material
