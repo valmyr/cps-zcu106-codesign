@@ -850,15 +850,14 @@ RUN java -version
 RUN gradle --version
 
 
-## Pin sbt to 1.x. The generated hardware project ships no sbt.version in
-## project/build.properties, so the launcher resolves whatever release is
-## current at build time -- which makes the image non-reproducible. From sbt
-## 2.x on, the launcher defaults to the sbtn thin client and leaves a server
-## running as a daemon: `sbt run` returns while the daemon keeps writing into
-## target/, so the smoke tests' `rm -rf` races it and fails with
-## "Directory not empty". sbt 2.x also compiles build.sbt with Scala 3, and
-## the generated build.sbt is written in the 1.x (Scala 2) DSL.
-ENV SBT_OPTS="-Dsbt.version=1.x.y"
+# Pin sbt to 1.x. The lfc code generator emits build.sbt but no
+# project/build.properties, so the launcher resolves whatever release is
+# current at build time -- which made the image non-reproducible. From sbt
+# 2.x on the launcher defaults to the sbtn thin client and leaves a server
+# running as a daemon, which races the smoke tests' `rm -rf`. sbt 2.x also
+# compiles build.sbt with Scala 3, while the generated build.sbt is 1.x
+# (Scala 2) DSL. 1.11.7 verified against Chisel 3.6.0 / Scala 2.13.10.
+ENV SBT_OPTS="-Dsbt.version=1.11.7"
 
 
 RUN sbt --version
@@ -924,7 +923,9 @@ WORKDIR /home/lingua-franca
 RUN git clone https://github.com/erlingrj/reactor-chisel-benchmarks.git
 RUN mkdir -p /tmp/smoketest4 && cat > /tmp/smoketest4/smoke4.lf <<'EOF'
 target Codesign {
-  fpgaBoard: ZCU106
+    fpgaBoard: ZCU106,
+    clock-period: 10 nsec,
+    timeout: 1 sec
 }
 reactor Fpga {
   input in: {= UInt(32.W) =}
@@ -936,8 +937,22 @@ reactor Fpga {
 reactor Sw {
   input in: uint32_t
   output out: uint32_t
-  reaction(startup) -> out {= out.set(1); =}
-  reaction(in) {= std::cout << "Got: " << *in.get() << std::endl; =}
+
+  state cnt0: uint32_t = 0
+
+  timer t(0, 200 nsec)
+
+  reaction(t) -> out {=
+    cnt0 += 1;
+    out.set(cnt0);
+  =}
+
+  reaction(in) {=
+    std::cout << std::endl
+              << "[INFO] SW out = " << cnt0
+              << ", HW in = " << *in.get()
+              << std::endl << std::endl;
+  =}
 }
 main reactor {
   @fpga
@@ -947,25 +962,24 @@ main reactor {
 }
 EOF
 
-## Temporarily Disabled
 
 
 
-#
-## Cleanup is grouped and its exit status discarded on purpose: the test's
-## own result must decide this layer. Leaving `rm` as the last link of the
-## && chain made a passing test fail the build. Do not hang `|| true` off
-## the chain itself -- that would make the test unable to fail at all.
-#
-##   (with sbt pinned to 1.x there is no daemon, so this is defense in depth)
-#
-#RUN cd /tmp/smoketest4 && \
-#    export PATH=/opt/lingua-franca/build/install/lf-cli/bin:$PATH && \
-#    lfc --target-compiler aarch64-linux-gnu-g++ /tmp/smoketest4/smoke4.lf && \
-#    file /tmp/smoketest4/./codesign-gen/smoke4/bin/_SwTop | grep -q "ARM aarch64" && \
-#    echo "SMOKE TEST 4 PASSED - software compiled automatically for ZCU106" && \
-#    { cd / ; sleep 3 ; rm -rf /tmp/smoketest4 2>/dev/null || rm -rf /tmp/smoketest4 || true ; }
-#
+
+# Cleanup is grouped and its exit status discarded on purpose: the test's
+# own result must decide this layer. Leaving `rm` as the last link of the
+# && chain made a passing test fail the build. Do not hang `|| true` off
+# the chain itself -- that would make the test unable to fail at all.
+
+#   (with sbt pinned to 1.x there is no daemon, so this is defense in depth)
+
+RUN cd /tmp/smoketest4 && \
+    export PATH=/opt/lingua-franca/build/install/lf-cli/bin:$PATH && \
+    lfc --target-compiler aarch64-linux-gnu-g++ /tmp/smoketest4/smoke4.lf && \
+    file /tmp/smoketest4/./codesign-gen/smoke4/bin/_SwTop | grep -q "ARM aarch64" && \
+    echo "SMOKE TEST 4 PASSED - software compiled automatically for ZCU106" && \
+    { cd / ; sleep 3 ; rm -rf /tmp/smoketest4 2>/dev/null || rm -rf /tmp/smoketest4 || true ; }
+
 RUN grep -q 'ZSH_THEME="jonathan"' ~/.zshrc && echo "jonathan theme configured successfully" || (echo "ERROR: theme was not applied" && exit 1)
 
 WORKDIR /home/lingua-franca
